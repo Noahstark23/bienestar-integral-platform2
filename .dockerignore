@@ -1,0 +1,16 @@
+node_modules
+dist
+.env
+*.env.local
+prisma/dev.db
+prisma/dev.db-journal
+prisma/dev.db-shm
+prisma/dev.db-wal
+.git
+.gitignore
+*.md
+*.log
+.vscode
+.idea
+coverage
+.nyc_output

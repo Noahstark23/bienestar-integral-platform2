@@ -1,0 +1,446 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// USER - Authentication
+// ============================================
+model User {
+  id                 Int      @id @default(autoincrement())
+  username           String   @unique
+  passwordHash       String   // bcrypt hash - NEVER store plain password
+  nombre             String
+  rol                String   @default("admin")
+  twoFactorSecret    String?  // TOTP secret (base32 encoded)
+  twoFactorEnabled   Boolean  @default(false)
+  createdAt          DateTime @default(now())
+}
+
+// ============================================
+// PATIENT MODEL - Enhanced with Demographics & Discharge
+// ============================================
+model Patient {
+  id                Int       @id @default(autoincrement())
+  nombre            String
+  edad              Int
+  telefono          String
+  motivo            String
+  
+  // Demographics
+  fechaNacimiento   DateTime?
+  ocupacion         String    @default("")
+  escolaridad       String    @default("")
+  estadoCivil       String    @default("")
+  
+  // Guardian Info (for minors)
+  tutorNombre       String?
+  tutorRelacion     String?   // "Madre", "Padre", "Tutor Legal", etc.
+  
+  // Status & Discharge
+  estado            String    @default("Activo")  // "Activo", "En Pausa", "Alta"
+  fechaAlta         DateTime?
+  motivoAlta        String    @default("")
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  // Relations
+  sessions          Session[]
+  clinicalRecord    ClinicalRecord?
+  therapeuticGoals  TherapeuticGoal[]
+  invoices          Invoice[]  // Billing relation
+  enrollments       WorkshopEnrollment[] // Talleres
+  waitlists         WorkshopWaitlist[]   // Lista de espera talleres
+  virtualSessions   VirtualSession[]     // Teleconsultas
+  sessionPackages   SessionPackage[]     // Paquetes de sesiones
+  assessments       Assessment[]         // Escalas psicológicas
+}
+
+// ============================================
+// CLINICAL RECORD - Anamnesis
+// ============================================
+model ClinicalRecord {
+  id                      Int      @id @default(autoincrement())
+  patientId               Int      @unique
+  antecedentesMedicos     String   @default("")
+  antecedentesFamiliares  String   @default("")
+  historiaDesarrollo      String   @default("")
+  diagnostico             String   @default("")
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+  
+  patient                 Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+}
+
+// ============================================
+// SESSION - Now with SOAP Notes Structure
+// ============================================
+model Session {
+  id            Int         @id @default(autoincrement())
+  patientId     Int
+  patientName   String
+  fecha         DateTime
+  pago          Float
+  estadoPago    String      @default("Pendiente")
+  tipo          String      @default("Terapia")  // "Evaluacion", "Terapia", "Consulta"
+  
+  // SOAP Notes Structure (replacing simple "notas")
+  notaSubjetiva String      @default("")  // S: What the patient says
+  notaObjetiva  String      @default("")  // O: What the therapist observes
+  notaAnalisis  String      @default("")  // A: Clinical interpretation
+  notaPlan      String      @default("")  // P: Treatment plan / Next steps
+  
+  // Legacy field for backwards compatibility
+  resumen       String      @default("")  // Can be used for quick summary
+  
+  // Billing
+  invoices      InvoiceSession[] // Relación con facturas
+  facturada     Boolean     @default(false) // Flag rápido
+  
+  createdAt     DateTime    @default(now())
+  
+  patient       Patient     @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  
+  @@index([patientId])
+  @@index([fecha])
+}
+
+// ============================================
+// THERAPEUTIC GOAL - Progress Tracking
+// ============================================
+model TherapeuticGoal {
+  id              Int        @id @default(autoincrement())
+  patientId       Int
+  titulo          String
+  descripcion     String     @default("")
+  estado          String     @default("Pendiente")  // "Pendiente", "EnProgreso", "Logrado", "Abandonado"
+  progreso        Int        @default(0)        // 0-100%
+  fechaInicio     DateTime   @default(now())
+  fechaLimite     DateTime?
+  fechaLogro      DateTime?
+  notas           String     @default("")
+  
+  patient         Patient    @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  
+  @@index([patientId])
+  @@index([estado])
+}
+
+// ============================================
+// EXPENSE - Financial Tracking
+// ============================================
+model Expense {
+  id        Int      @id @default(autoincrement())
+  fecha     DateTime
+  concepto  String
+  monto     Float
+  categoria String   @default("Operativo")
+  createdAt DateTime @default(now())
+  
+  @@index([fecha])
+}
+
+// ============================================
+// APPOINTMENT - Online Booking
+// ============================================
+model Appointment {
+  id              Int      @id @default(autoincrement())
+  nombrePaciente  String
+  telefono        String
+  email           String   @default("")
+  fechaHora       DateTime
+  motivo          String   @default("")
+  estado          String   @default("Pendiente")
+  createdAt       DateTime @default(now())
+  
+  @@index([fechaHora])
+  @@index([estado])
+}
+
+// ============================================
+// AVAILABILITY SLOT - Therapist Schedule
+// ============================================
+model AvailabilitySlot {
+  id          Int      @id @default(autoincrement())
+  dayOfWeek   Int      // 0=Sunday, 1=Monday, ..., 6=Saturday
+  startTime   String   // "08:00" format HH:mm
+  endTime     String   // "17:00" format HH:mm
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([dayOfWeek])
+  @@index([isActive])
+}
+
+// ============================================
+// BILLING SYSTEM - Facturación y Pagos
+// ============================================
+
+// Facturas/Invoices
+model Invoice {
+  id                Int       @id @default(autoincrement())
+  numeroFactura     String    @unique // "FAC-2026-001"
+  
+  // Relación con paciente
+  patientId         Int
+  patient           Patient   @relation(fields: [patientId], references: [id])
+  
+  // Sesiones incluidas (many-to-many)
+  sessions          InvoiceSession[]
+  
+  // Montos
+  subtotal          Float
+  descuento         Float     @default(0)
+  iva               Float     @default(0)      // 15% Nicaragua
+  total             Float
+  
+  // Control de pagos
+  pagado            Float     @default(0)      // Suma de payments
+  saldo             Float                      // total - pagado
+  
+  // Metadata
+  fechaEmision      DateTime  @default(now())
+  fechaVencimiento  DateTime                   // +15 días típicamente
+  estado            String    @default("Pendiente") // Pendiente/Pagada/Vencida/Cancelada
+  
+  // Pagos relacionados
+  payments          Payment[]
+  workshops         InvoiceWorkshop[] // Talleres facturados
+  items             InvoiceItem[]     // Ítems personalizados
+
+  // Notas adicionales
+  notas             String    @default("")
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+}
+
+// Relación many-to-many Invoice <-> Session
+model InvoiceSession {
+  id          Int       @id @default(autoincrement())
+  invoiceId   Int
+  invoice     Invoice   @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  sessionId   Int
+  session     Session   @relation(fields: [sessionId], references: [id])
+  
+  // Precio en el momento de facturar
+  monto       Float
+  
+  @@unique([invoiceId, sessionId])
+}
+
+// Ítems personalizados en factura
+model InvoiceItem {
+  id          Int       @id @default(autoincrement())
+  invoiceId   Int
+  invoice     Invoice   @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  
+  description String
+  quantity    Int       @default(1)
+  unitPrice   Float
+  amount      Float     // quantity * unitPrice
+  
+  @@index([invoiceId])
+}
+
+// Registro de Pagos
+model Payment {
+  id              Int       @id @default(autoincrement())
+  invoiceId       Int
+  invoice         Invoice   @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  
+  monto           Float
+  metodoPago      String    // "Efectivo", "Tarjeta", "Transferencia", "Sinpe"
+  referencia      String    @default("") // # transacción, # cheque
+  
+  fechaPago       DateTime  @default(now())
+  registradoPor   String    @default("Sistema") // Futuro: userId
+  
+  notas           String    @default("")
+  
+  createdAt       DateTime  @default(now())
+}
+
+// ============================================
+// WORKSHOPS - Talleres y Cursos
+// ============================================
+
+model Workshop {
+  id          Int       @id @default(autoincrement())
+  titulo      String
+  descripcion String    @default("")
+  fechaInicio DateTime
+  fechaFin    DateTime?
+  horario     String    @default("") // "Sábados 9-12"
+  ubicacion   String    @default("Consultorio") // "Online", "Consultorio"
+  
+  precio      Float
+  cupoMaximo  Int       @default(10)
+  
+  estado      String    @default("Abierto") // "Abierto", "Cerrado", "Finalizado"
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  enrollments WorkshopEnrollment[]
+  waitlist    WorkshopWaitlist[]
+}
+
+model WorkshopEnrollment {
+  id          Int       @id @default(autoincrement())
+  workshopId  Int
+  workshop    Workshop  @relation(fields: [workshopId], references: [id], onDelete: Cascade)
+  
+  patientId   Int
+  patient     Patient   @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  
+  fechaInscripcion DateTime @default(now())
+  pagado      Boolean   @default(false)
+  
+  // Billing link
+  invoices    InvoiceWorkshop[]
+
+  @@unique([workshopId, patientId])
+}
+
+model InvoiceWorkshop {
+  id            Int       @id @default(autoincrement())
+  invoiceId     Int
+  invoice       Invoice   @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  
+  enrollmentId  Int
+  enrollment    WorkshopEnrollment @relation(fields: [enrollmentId], references: [id])
+  
+  monto         Float
+  
+  @@unique([invoiceId, enrollmentId])
+}
+
+// ============================================
+// TELEMEDICINE - Teleconsultas
+// ============================================
+
+// Horarios de disponibilidad para telemedicina
+model TelmedAvailability {
+  id        Int      @id @default(autoincrement())
+  dayOfWeek Int      // 0=Domingo, 1=Lunes...6=Sábado
+  startTime String   // "08:00" formato HH:mm
+  endTime   String   // "12:00" formato HH:mm
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([dayOfWeek])
+  @@index([isActive])
+}
+
+// Sesiones virtuales individuales
+model VirtualSession {
+  id              Int       @id @default(autoincrement())
+  codigo          String    @unique   // "VS-ABC123" — código que recibe el paciente
+  roomName        String    @unique   // Nombre real de la sala Jitsi (interno)
+
+  // Relación con paciente (opcional, puede ser invitado externo)
+  patientId       Int?
+  patient         Patient?  @relation(fields: [patientId], references: [id])
+
+  nombrePaciente  String
+  telefono        String    @default("")
+
+  // Programación
+  fechaHora       DateTime  // Cuándo está programada
+  duracion        Int       @default(60) // Duración en minutos
+
+  // Estado del flujo
+  estado          String    @default("Solicitada")
+  // "Solicitada" | "Aprobada" | "EnCurso" | "Completada" | "Cancelada" | "NoShow"
+
+  // Notas post-sesión
+  notas           String    @default("")
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([codigo])
+  @@index([fechaHora])
+  @@index([estado])
+}
+
+// ============================================
+// WORKSHOP WAITLIST - Lista de espera
+// ============================================
+model WorkshopWaitlist {
+  id         Int      @id @default(autoincrement())
+  workshopId Int
+  workshop   Workshop @relation(fields: [workshopId], references: [id], onDelete: Cascade)
+  patientId  Int
+  patient    Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  creadoEn   DateTime @default(now())
+
+  @@unique([workshopId, patientId])
+  @@index([workshopId])
+}
+
+// ============================================
+// SESSION PACKAGES - Paquetes de sesiones
+// ============================================
+model SessionPackage {
+  id             Int      @id @default(autoincrement())
+  patientId      Int
+  patient        Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  titulo         String
+  totalSesiones  Int
+  sesionesUsadas Int      @default(0)
+  precioTotal    Float
+  estado         String   @default("Activo") // "Activo" | "Agotado" | "Cancelado"
+  notas          String   @default("")
+  creadoEn       DateTime @default(now())
+
+  @@index([patientId])
+  @@index([estado])
+}
+
+// ============================================
+// ASSESSMENT - Escalas Psicológicas (PHQ-9, GAD-7)
+// ============================================
+model Assessment {
+  id             Int      @id @default(autoincrement())
+  patientId      Int
+  tipo           String   // "PHQ9" | "GAD7"
+  respuestas     String   // JSON array de respuestas [0-3]
+  puntaje        Int
+  interpretacion String   // "Mínimo" | "Leve" | "Moderado" | "Moderado-Severo" | "Severo"
+  sessionId      Int?     // opcional, vinculado a sesión
+  notas          String   @default("")
+  fecha          DateTime @default(now())
+  createdAt      DateTime @default(now())
+
+  patient        Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([patientId])
+  @@index([tipo])
+  @@index([fecha])
+}
+
+// ============================================
+// AUDIT LOG - Registro de auditoría
+// ============================================
+model AuditLog {
+  id        Int      @id @default(autoincrement())
+  usuario   String
+  accion    String   // e.g. CREATE_PATIENT, UPDATE_INVOICE, DELETE_SESSION
+  entidad   String   // e.g. Patient, Invoice, Session
+  entidadId Int?
+  detalle   String   @default("")
+  ip        String   @default("")
+  creadoEn  DateTime @default(now())
+
+  @@index([creadoEn])
+  @@index([entidad])
+}

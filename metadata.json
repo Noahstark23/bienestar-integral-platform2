@@ -1,0 +1,5 @@
+{
+  "name": "Consultorio Bienestar Integral",
+  "description": "Sistema de gestión clínica y web corporativa para consultorio psicológico con módulo de citas, chatbot y dashboard financiero.",
+  "requestFramePermissions": []
+}

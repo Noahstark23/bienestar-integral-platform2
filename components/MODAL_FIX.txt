@@ -1,0 +1,10 @@
+// NOTE: Modal is rendered after line 423 (after </div>)
+// Add this code manually if not present:
+
+{/* Patient Details Modal */}
+{selectedPatientId !== null && (
+  <PatientDetails
+    patientId={selectedPatientId}
+    onClose={() => setSelectedPatientId(null)}
+  />
+)}
