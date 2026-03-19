@@ -3,29 +3,21 @@ set -e
 
 echo "=== Bienestar Integral — Iniciando ==="
 
-# Extraer host y puerto del DATABASE_URL
-DB_HOST=$(echo $DATABASE_URL | sed 's/.*@\([^:]*\):.*/\1/')
-DB_PORT=$(echo $DATABASE_URL | sed 's/.*:\([0-9]*\)\/.*/\1/')
-
-echo "Esperando base de datos en $DB_HOST:$DB_PORT..."
+echo "Esperando base de datos..."
 MAX_TRIES=30
 COUNT=0
-until nc -z "$DB_HOST" "$DB_PORT" 2>/dev/null; do
+until npx prisma db push --accept-data-loss 2>/dev/null; do
   COUNT=$((COUNT+1))
   if [ "$COUNT" -ge "$MAX_TRIES" ]; then
-    echo "ERROR: No se pudo conectar a $DB_HOST:$DB_PORT después de $MAX_TRIES intentos."
+    echo "ERROR: No se pudo conectar a la base de datos después de $MAX_TRIES intentos."
     exit 1
   fi
-  echo "  Intento $COUNT/$MAX_TRIES — reintentando en 2s..."
-  sleep 2
+  echo "  Intento $COUNT/$MAX_TRIES — reintentando en 3s..."
+  sleep 3
 done
-echo "Base de datos disponible."
 
-# Push schema
-echo "Sincronizando schema..."
-npx prisma db push --accept-data-loss
+echo "Schema sincronizado."
 
-# Seed admin user
 echo "Verificando usuario admin..."
 node server/seed-admin.js
 
