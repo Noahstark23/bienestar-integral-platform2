@@ -38,6 +38,9 @@ COPY server ./server
 COPY docker-entrypoint.sh ./docker-entrypoint.sh
 RUN chmod +x docker-entrypoint.sh
 
+# Install netcat for DB health check
+RUN apk add --no-cache netcat-openbsd
+
 # Non-root user for security
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 RUN chown -R appuser:appgroup /app
