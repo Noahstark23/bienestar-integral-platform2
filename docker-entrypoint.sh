@@ -6,7 +6,7 @@ echo "=== Bienestar Integral — Iniciando ==="
 echo "Esperando base de datos..."
 MAX_TRIES=30
 COUNT=0
-until npx prisma db push --accept-data-loss 2>/dev/null; do
+until npx prisma db push --accept-data-loss; do
   COUNT=$((COUNT+1))
   if [ "$COUNT" -ge "$MAX_TRIES" ]; then
     echo "ERROR: No se pudo conectar a la base de datos después de $MAX_TRIES intentos."
