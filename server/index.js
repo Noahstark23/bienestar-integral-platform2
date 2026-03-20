@@ -4,7 +4,6 @@ import helmet from 'helmet';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { createServer as createViteServer } from 'vite';
 
 dotenv.config();
 
@@ -107,6 +106,7 @@ async function startServer() {
         });
         logger.info(`Modo PRODUCCION — sirviendo desde ${distPath}`);
     } else {
+        const { createServer: createViteServer } = await import('vite');
         const vite = await createViteServer({
             server: { middlewareMode: true },
             appType: 'spa'
