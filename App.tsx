@@ -23,6 +23,10 @@ function App() {
   // --- Booking Modal State ---
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
 
+  const handleBookingClick = () => {
+    window.open('https://wa.me/50587171712?text=Hola%20Lic.%20Esmirna%2C%20me%20gustar%C3%ADa%20agendar%20una%20cita.', '_blank');
+  };
+
   // --- Virtual Room / Jitsi State ---
   const [activeRoom, setActiveRoom] = useState<string | null>(null);
   const [jitsiDisplayName, setJitsiDisplayName] = useState('');
@@ -80,7 +84,7 @@ function App() {
               Portal Paciente
             </button>
             <button
-              onClick={() => setIsBookingModalOpen(true)}
+              onClick={handleBookingClick}
               className="bg-brand-600 text-white px-5 py-2.5 rounded-full font-medium shadow-md hover:bg-brand-700 hover:shadow-lg transition-all transform hover:-translate-y-0.5"
             >
               Agendar Cita
@@ -155,7 +159,7 @@ function App() {
             </button>
 
             <button
-              onClick={() => setIsBookingModalOpen(true)}
+              onClick={handleBookingClick}
               className="w-full mt-4 bg-brand-600 text-white px-5 py-3 rounded-lg font-bold"
             >
               Agendar Cita
@@ -275,7 +279,7 @@ function App() {
             </p>
             <div className="flex flex-col sm:flex-row gap-4 pt-4">
               <button
-                onClick={() => setIsBookingModalOpen(true)}
+                onClick={handleBookingClick}
                 className="bg-brand-600 text-white px-8 py-3.5 rounded-lg font-bold shadow-lg hover:bg-brand-700 transition-all"
               >
                 Reserva tu Cita
@@ -482,7 +486,7 @@ function App() {
           <Services />
           <About />
           <Footer />
-          <ChatWidget onOpenBooking={() => setIsBookingModalOpen(true)} />
+          <ChatWidget onOpenBooking={handleBookingClick} />
 
           {/* Share Modal */}
           {isShareModalOpen && (
