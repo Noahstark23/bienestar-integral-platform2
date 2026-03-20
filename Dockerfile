@@ -8,6 +8,9 @@ RUN NODE_ENV=development npm ci
 
 COPY . .
 
+# Install openssl for Prisma
+RUN apk add --no-cache openssl
+
 # Build Vite frontend (outputs to /app/dist)
 RUN npm run build
 
@@ -38,8 +41,8 @@ COPY server ./server
 COPY docker-entrypoint.sh ./docker-entrypoint.sh
 RUN chmod +x docker-entrypoint.sh
 
-# Install netcat for DB health check
-RUN apk add --no-cache netcat-openbsd
+# Install netcat for DB health check and openssl for Prisma
+RUN apk add --no-cache netcat-openbsd openssl
 
 # Non-root user for security
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
