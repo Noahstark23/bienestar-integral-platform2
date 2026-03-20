@@ -15,6 +15,12 @@ export default defineConfig(({ mode }) => {
         '@': path.resolve(__dirname, '.'),
       }
     },
+    build: {
+      // Desactivamos la minificación para que el build termine rapidísimo
+      // y no alcance el límite de 10 minutos de Coolify en servidores pequeños.
+      minify: false,
+      sourcemap: false
+    },
     server: {
       proxy: {
         '/api': {
