@@ -87,10 +87,7 @@ app.use('/api/workshops', workshopsRouter);
 app.use('/api/packages', packagesRouter);
 app.use('/api/audit', auditRouter);
 app.use('/api/portal', patientPortalRouter);
-
-// Error handlers (deben ir después de todas las rutas)
-app.use(notFoundHandler);
-app.use(errorHandler);
+// Error handlers will be mounted at the end of startServer
 
 // ============================================
 // STARTUP — Dev vs Producción
@@ -101,8 +98,12 @@ async function startServer() {
     if (isProd) {
         const distPath = path.join(__dirname, '..', 'dist');
         app.use(express.static(distPath));
-        app.get('*', (req, res) => {
-            if (!req.path.startsWith('/api')) res.sendFile(path.join(distPath, 'index.html'));
+        app.get('*', (req, res, next) => {
+            if (!req.path.startsWith('/api')) {
+                res.sendFile(path.join(distPath, 'index.html'));
+            } else {
+                next();
+            }
         });
         logger.info(`Modo PRODUCCION — sirviendo desde ${distPath}`);
     } else {
@@ -114,6 +115,10 @@ async function startServer() {
         app.use(vite.middlewares);
         logger.info('Modo DESARROLLO — Vite dev server activo');
     }
+
+    // Error handlers (deben ir después de todas las rutas y middlewares)
+    app.use(notFoundHandler);
+    app.use(errorHandler);
 
     app.listen(PORT, () => {
         logger.info(`Servidor corriendo en http://localhost:${PORT}`);
