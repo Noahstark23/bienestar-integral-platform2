@@ -36,9 +36,9 @@ export const AvailabilityManager: React.FC = () => {
 
     const fetchSlots = async () => {
         try {
-            const res = await fetch('/api/availability');
+            const res = await fetch('/api/availability', { headers: getAuthHeaders() });
             const data = await res.json();
-            setSlots(data);
+            setSlots(Array.isArray(data) ? data : []);
         } catch (err) {
             setError('Error al cargar horarios');
         } finally {
