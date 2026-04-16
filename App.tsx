@@ -7,6 +7,7 @@ import { BookingModal } from './components/BookingModal';
 import { VirtualWaitingRoom } from './components/VirtualWaitingRoom';
 import { JitsiMeetComponent } from './components/JitsiMeetComponent';
 import { PatientPortal } from './components/PatientPortal';
+import { AgentChat } from './components/AgentChat';
 import { useAuth } from './hooks/useAuth';
 import { SERVICES_LIST, CONTACT_INFO } from './constants';
 import { ViewState } from './types';
@@ -437,6 +438,7 @@ function App() {
           </button>
         </div>
         <AdminDashboard />
+        {user && token && <AgentChat token={token} userName={user.nombre} />}
       </div>
     );
   }
