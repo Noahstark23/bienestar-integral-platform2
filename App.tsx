@@ -299,17 +299,27 @@ function App() {
             </div>
           </div>
           <div className="relative">
-            {/* Abstract organic shapes behind image */}
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[120%] h-[120%] bg-brand-200/50 rounded-full blur-3xl -z-10"></div>
-            <div className="relative rounded-2xl overflow-hidden shadow-2xl border-4 border-white rotate-2 hover:rotate-0 transition-all duration-500">
-              <img
-                src="https://picsum.photos/600/700?grayscale"
-                alt="Lic. Esmirna García Consultorio"
-                className="w-full h-auto object-cover"
-              />
-              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-6 text-white">
-                <p className="font-bold text-lg">Lic. Esmirna García</p>
-                <p className="text-sm opacity-90">Psicóloga Clínica</p>
+            {/* Foto principal con mini-fotos flotantes */}
+            <div className="relative">
+              <div className="relative rounded-2xl overflow-hidden shadow-2xl border-4 border-white rotate-1 hover:rotate-0 transition-all duration-500 max-h-[520px]">
+                <img
+                  src="/images/isabel2.jpeg"
+                  alt="Lic. Esmirna García Hernández"
+                  className="w-full h-full object-cover object-top"
+                />
+                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-6 text-white">
+                  <p className="font-bold text-lg">Lic. Esmirna I. García Hernández</p>
+                  <p className="text-sm opacity-90">Psicóloga Clínica y Psicoterapeuta</p>
+                </div>
+              </div>
+              {/* Mini foto flotante izquierda */}
+              <div className="absolute -left-6 top-1/4 w-24 h-28 rounded-xl overflow-hidden shadow-xl border-3 border-white -rotate-3 hidden md:block">
+                <img src="/images/isabel1.jpeg" alt="Lic. Esmirna García" className="w-full h-full object-cover object-top" />
+              </div>
+              {/* Mini foto flotante derecha */}
+              <div className="absolute -right-4 bottom-1/4 w-24 h-28 rounded-xl overflow-hidden shadow-xl border-3 border-white rotate-3 hidden md:block">
+                <img src="/images/isabel6.jpeg" alt="Lic. Esmirna García" className="w-full h-full object-cover object-top" />
               </div>
             </div>
           </div>
@@ -321,6 +331,8 @@ function App() {
   const About = () => (
     <section id="sobre-mi" className="py-24 bg-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+
+        {/* Encabezado */}
         <div className="max-w-3xl mx-auto text-center mb-16">
           <h2 className="text-3xl font-bold text-slate-900 mb-4">Experiencia y Profesionalismo</h2>
           <p className="text-slate-600 text-lg">
@@ -328,7 +340,8 @@ function App() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        {/* Tarjetas de info */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-20">
           <div className="p-8 bg-slate-50 rounded-2xl border border-slate-100 hover:shadow-lg transition-shadow">
             <h3 className="text-xl font-bold text-brand-700 mb-2">Formación Académica</h3>
             <p className="text-slate-600">Licenciada por la UNAN-Managua. Máster en Psicología Clínica y especializaciones en Neurodesarrollo.</p>
@@ -342,6 +355,36 @@ function App() {
             <p className="text-slate-600">Atención presencial en clínicas equipadas en Estelí y Matagalpa. Modalidad virtual disponible.</p>
           </div>
         </div>
+
+        {/* Galería de fotos */}
+        <div className="text-center mb-10">
+          <span className="inline-block px-4 py-1.5 bg-brand-100 text-brand-700 rounded-full font-semibold text-sm mb-3">Galería</span>
+          <h3 className="text-2xl font-bold text-slate-900">Conoce a la Licenciada</h3>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+          {[
+            { src: '/images/isabel1.jpeg', alt: 'Lic. Esmirna García — Consulta' },
+            { src: '/images/isabel3.jpeg', alt: 'Lic. Esmirna García — Neuropsicología' },
+            { src: '/images/isabel4.jpeg', alt: 'Lic. Esmirna García — Clínica' },
+            { src: '/images/isabel5.jpeg', alt: 'Lic. Esmirna García — Psicoterapeuta' },
+            { src: '/images/isabel6.jpeg', alt: 'Consultorio Bienestar Integral' },
+            { src: '/images/isabel2.jpeg', alt: 'Lic. Esmirna García Hernández' },
+          ].map((foto, i) => (
+            <div
+              key={i}
+              className={`relative overflow-hidden rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 group ${i === 0 ? 'row-span-2' : ''}`}
+            >
+              <img
+                src={foto.src}
+                alt={foto.alt}
+                className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-500"
+                style={{ minHeight: i === 0 ? '380px' : '180px', maxHeight: i === 0 ? '460px' : '220px' }}
+              />
+              <div className="absolute inset-0 bg-brand-900/0 group-hover:bg-brand-900/20 transition-colors duration-300 rounded-2xl" />
+            </div>
+          ))}
+        </div>
+
       </div>
     </section>
   );
