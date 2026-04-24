@@ -25,7 +25,7 @@ function App() {
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
 
   const handleBookingClick = () => {
-    window.open('https://wa.me/50587171712?text=Hola%20Lic.%20Esmirna%2C%20me%20gustar%C3%ADa%20agendar%20una%20cita.', '_blank');
+    window.open('https://wa.me/50587171412?text=Hola%20Lic.%20Esmirna%2C%20me%20gustar%C3%ADa%20agendar%20una%20cita.', '_blank');
   };
 
   // --- Virtual Room / Jitsi State ---

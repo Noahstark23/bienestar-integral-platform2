@@ -5,7 +5,7 @@ import React from 'react';
 // --- Static Content ---
 
 export const CONTACT_INFO = {
-  phone: "87171712",
+  phone: "87171412",
   socials: {
     facebook: "#",
     instagram: "#",

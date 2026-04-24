@@ -26,7 +26,7 @@ HORARIOS:
 Lunes a Sábado: 8:00 AM - 5:00 PM
 
 CONTACTO:
-- Teléfono: 87171712
+- Teléfono: 87171412
 - Redes sociales: Facebook, Instagram, TikTok
 
 PERSONALIDAD:

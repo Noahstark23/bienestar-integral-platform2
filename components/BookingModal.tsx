@@ -157,7 +157,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ onClose }) => {
                                 required
                                 pattern="[0-9]{8}"
                                 className="w-full px-4 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 transition-all"
-                                placeholder="87171712"
+                                placeholder="87171412"
                             />
                             <p className="text-xs text-slate-400 mt-1">8 dígitos sin espacios</p>
                         </div>

@@ -102,7 +102,7 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ onOpenBooking = () => { 
           ...filtered,
           {
             id: (Date.now() + 1).toString(),
-            text: 'Lo siento, hubo un error de conexión. Por favor intenta de nuevo o llámanos al 87171712.',
+            text: 'Lo siento, hubo un error de conexión. Por favor intenta de nuevo o llámanos al 87171412.',
             sender: 'bot',
             timestamp: new Date()
           }
