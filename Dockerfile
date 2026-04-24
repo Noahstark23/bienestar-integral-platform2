@@ -11,8 +11,8 @@ COPY . .
 # Install openssl for Prisma
 RUN apk add --no-cache openssl
 
-# Build Vite frontend (outputs to /app/dist) — limit RAM para droplets de 1GB
-RUN NODE_OPTIONS="--max-old-space-size=512" npm run build
+# Build Vite frontend (outputs to /app/dist)
+RUN NODE_OPTIONS="--max-old-space-size=1024" npm run build
 
 # Generate Prisma client for production target
 RUN npx prisma generate
