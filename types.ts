@@ -56,6 +56,8 @@ export interface Appointment {
   id: number;
   nombrePaciente: string;
   telefono: string;
+  email: string;
+  motivo: string;
   fechaHora: string;
   estado: 'Pendiente' | 'Confirmada' | 'Cancelada';
   createdAt: string;

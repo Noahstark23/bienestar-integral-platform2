@@ -74,7 +74,7 @@ router.get('/', authenticateToken, async (req, res, next) => {
 // POST /api/appointments (PÚBLICO — desde landing page)
 router.post('/', async (req, res, next) => {
     try {
-        const { nombre, telefono, fechaHora } = req.body;
+        const { nombre, telefono, fechaHora, email = '', motivo = '' } = req.body;
 
         if (!nombre || !telefono || !fechaHora) {
             return res.status(400).json({
@@ -99,7 +99,7 @@ router.post('/', async (req, res, next) => {
         }
 
         const newAppointment = await prisma.appointment.create({
-            data: { nombrePaciente: nombre, telefono, fechaHora: fecha }
+            data: { nombrePaciente: nombre, telefono, fechaHora: fecha, email, motivo }
         });
 
         res.status(201).json(newAppointment);

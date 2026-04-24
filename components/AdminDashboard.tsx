@@ -910,9 +910,9 @@ export const AdminDashboard: React.FC = () => {
                   <tr>
                     <th className="px-6 py-4">Paciente</th>
                     <th className="px-6 py-4">Teléfono</th>
+                    <th className="px-6 py-4">Motivo</th>
                     <th className="px-6 py-4">Fecha & Hora</th>
                     <th className="px-6 py-4">Estado</th>
-                    <th className="px-6 py-4">Solicitada</th>
                     <th className="px-6 py-4">Acciones</th>
                   </tr>
                 </thead>
@@ -929,6 +929,7 @@ export const AdminDashboard: React.FC = () => {
                       <tr key={appointment.id} className="hover:bg-slate-50 transition-colors">
                         <td className="px-6 py-4 font-medium text-slate-900">{appointment.nombrePaciente}</td>
                         <td className="px-6 py-4">{appointment.telefono}</td>
+                        <td className="px-6 py-4 text-slate-600 text-xs max-w-[160px] truncate" title={appointment.motivo}>{appointment.motivo || '—'}</td>
                         <td className="px-6 py-4">
                           {new Date(appointment.fechaHora).toLocaleString('es-NI', {
                             dateStyle: 'medium',

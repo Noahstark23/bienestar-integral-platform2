@@ -70,6 +70,21 @@ router.delete('/:id', authenticateToken, async (req, res, next) => {
     }
 });
 
+// GET /api/availability/public (PÚBLICO — días y horarios disponibles para el formulario de citas)
+router.get('/public', async (req, res, next) => {
+    try {
+        const slots = await prisma.availabilitySlot.findMany({
+            where: { isActive: true },
+            select: { dayOfWeek: true, startTime: true, endTime: true },
+            orderBy: [{ dayOfWeek: 'asc' }, { startTime: 'asc' }]
+        });
+        res.json(slots);
+    } catch (err) {
+        logger.error('GET /api/availability/public', err);
+        next(err);
+    }
+});
+
 // POST /api/availability/check (PÚBLICO — usado desde landing page)
 router.post('/check', async (req, res, next) => {
     try {

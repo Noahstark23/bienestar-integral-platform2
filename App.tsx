@@ -3,7 +3,7 @@ import { Menu, X, Instagram, Facebook, Phone, MapPin, ExternalLink, Lock, Share2
 import { ChatWidget } from './components/ChatWidget';
 import { AdminDashboard } from './components/AdminDashboard';
 import { LoginPage } from './components/LoginPage';
-import { BookingModal } from './components/BookingModal';
+import { BookingFormModal } from './components/BookingFormModal';
 import { VirtualWaitingRoom } from './components/VirtualWaitingRoom';
 import { JitsiMeetComponent } from './components/JitsiMeetComponent';
 import { PatientPortal } from './components/PatientPortal';
@@ -25,7 +25,7 @@ function App() {
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
 
   const handleBookingClick = () => {
-    window.open('https://wa.me/50587171412?text=Hola%20Lic.%20Esmirna%2C%20me%20gustar%C3%ADa%20agendar%20una%20cita.', '_blank');
+    setIsBookingModalOpen(true);
   };
 
   // --- Virtual Room / Jitsi State ---
@@ -537,9 +537,10 @@ function App() {
           {isShareModalOpen && (
             <ShareModal onClose={() => setIsShareModalOpen(false)} />
           )}
-          {isBookingModalOpen && (
-            <BookingModal onClose={() => setIsBookingModalOpen(false)} />
-          )}
+          <BookingFormModal
+            isOpen={isBookingModalOpen}
+            onClose={() => setIsBookingModalOpen(false)}
+          />
         </>
       ) : null}
     </div>
