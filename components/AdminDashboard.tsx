@@ -5,7 +5,8 @@ import {
 } from 'recharts';
 import {
   DollarSign, Users, Calendar, TrendingUp, TrendingDown,
-  FileText, Plus, Search, Clock, CheckCircle, XCircle, Receipt, GraduationCap, Video, Download
+  FileText, Plus, Search, Clock, CheckCircle, XCircle, Receipt, GraduationCap, Video, Download,
+  Bell, MessageCircle, Mail
 } from 'lucide-react';
 import { AdminTab, Patient, Session, Expense, Appointment } from '../types';
 import { PatientDetails } from './PatientDetails';

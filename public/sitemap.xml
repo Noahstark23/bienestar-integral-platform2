@@ -1,13 +1,83 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+
+  <!-- Página principal -->
   <url>
     <loc>https://psicoisabel.com/</loc>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
+    <lastmod>2026-04-24</lastmod>
   </url>
+
+  <!-- Artículos de blog -->
   <url>
     <loc>https://psicoisabel.com/blog/cuando-buscar-psicologo-en-esteli/</loc>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
+    <lastmod>2026-04-24</lastmod>
   </url>
+
+  <url>
+    <loc>https://psicoisabel.com/blog/terapia-de-pareja-matagalpa/</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <lastmod>2026-04-24</lastmod>
+  </url>
+
+  <url>
+    <loc>https://psicoisabel.com/blog/ansiedad-adolescentes-nicaragua/</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <lastmod>2026-04-24</lastmod>
+  </url>
+
+  <url>
+    <loc>https://psicoisabel.com/blog/primera-consulta-psicologica/</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <lastmod>2026-04-24</lastmod>
+  </url>
+
+  <url>
+    <loc>https://psicoisabel.com/blog/neuropsicologia-esteli/</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <lastmod>2026-04-24</lastmod>
+  </url>
+
+  <url>
+    <loc>https://psicoisabel.com/blog/depresion-nicaragua-sintomas-ayuda/</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <lastmod>2026-04-24</lastmod>
+  </url>
+
+  <url>
+    <loc>https://psicoisabel.com/blog/terapia-lenguaje-ninos-esteli/</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <lastmod>2026-04-24</lastmod>
+  </url>
+
+  <url>
+    <loc>https://psicoisabel.com/blog/estres-laboral-como-manejarlo/</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <lastmod>2026-04-24</lastmod>
+  </url>
+
+  <url>
+    <loc>https://psicoisabel.com/blog/duelo-perdida-acompanamiento-psicologico/</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <lastmod>2026-04-24</lastmod>
+  </url>
+
+  <url>
+    <loc>https://psicoisabel.com/blog/autoestima-baja-terapia-psicologica/</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <lastmod>2026-04-24</lastmod>
+  </url>
+
 </urlset>

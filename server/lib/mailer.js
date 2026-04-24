@@ -104,6 +104,48 @@ export async function sendAppointmentReminder(appointment) {
 }
 
 /**
+ * Envía recordatorio de sesión clínica 24h antes.
+ * `session` debe incluir session.patient (con email, nombre, telefono).
+ */
+export async function sendSessionReminder(session) {
+    if (!transporter || !session.patient?.email) return;
+
+    const fecha = new Date(session.fecha);
+    const fechaStr = fecha.toLocaleDateString('es-NI', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    const horaStr  = fecha.toLocaleTimeString('es-NI', { hour: '2-digit', minute: '2-digit' });
+
+    const html = `
+        <div style="font-family: Arial, sans-serif; max-width: 520px; margin: auto; padding: 24px; color: #1e293b;">
+            <h2 style="color: #4f46e5; margin-bottom: 4px;">Bienestar Integral</h2>
+            <p style="color: #64748b; font-size: 14px; margin-top: 0;">Consultorio Psicológico</p>
+            <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 16px 0;">
+            <h3 style="font-size: 18px;">🔔 Recordatorio: tienes una sesión mañana</h3>
+            <p>Hola <strong>${session.patient.nombre}</strong>,</p>
+            <p>Te recordamos que tienes una sesión programada para mañana:</p>
+            <div style="background: #f0f4ff; border-left: 4px solid #4f46e5; padding: 12px 16px; border-radius: 4px; margin: 16px 0;">
+                <p style="margin: 0; font-size: 16px;"><strong>${fechaStr}</strong></p>
+                <p style="margin: 4px 0 0; font-size: 15px; color: #4f46e5;">🕐 ${horaStr}</p>
+                ${session.tipo ? `<p style="margin: 4px 0 0; color: #64748b;">${session.tipo}</p>` : ''}
+            </div>
+            <p>Por favor llega 5 minutos antes. Si necesitas cancelar o reprogramar, contáctanos con anticipación.</p>
+            <p style="color: #64748b; font-size: 13px; margin-top: 24px;">— Lic. Esmirna García · Bienestar Integral</p>
+        </div>
+    `;
+
+    try {
+        await transporter.sendMail({
+            from: FROM,
+            to: session.patient.email,
+            subject: `🔔 Recordatorio: Sesión mañana a las ${horaStr}`,
+            html
+        });
+        logger.info(`Recordatorio sesión enviado a ${session.patient.email}`);
+    } catch (err) {
+        logger.error(`Error enviando recordatorio sesión a ${session.patient.email}`, err);
+    }
+}
+
+/**
  * Envía recordatorio de factura pendiente al paciente.
  */
 export async function sendInvoiceReminder(invoice) {

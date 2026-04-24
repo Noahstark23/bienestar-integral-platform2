@@ -13,7 +13,7 @@ import { SERVICES_LIST, CONTACT_INFO } from './constants';
 import { ViewState } from './types';
 
 function App() {
-  const { isAuthenticated, user, login, logout } = useAuth();
+  const { isAuthenticated, user, token, login, logout } = useAuth();
   const [currentView, setCurrentView] = useState<ViewState>('landing');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 

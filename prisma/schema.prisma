@@ -38,6 +38,9 @@ model Patient {
   estadoCivil       String    @default("")
   
   // Guardian Info (for minors)
+  email             String    @default("")
+
+  // Guardian Info (for minors)
   tutorNombre       String?
   tutorRelacion     String?   // "Madre", "Padre", "Tutor Legal", etc.
   

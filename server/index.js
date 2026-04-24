@@ -30,6 +30,7 @@ import packagesRouter from './routes/packages.js';
 import patientPortalRouter from './routes/patient-portal.js';
 import assessmentsRouter from './routes/assessments.js';
 import agentRouter from './routes/agent.js';
+import remindersRouter from './routes/reminders.js';
 import { startReminderJob } from './jobs/reminders.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -89,6 +90,7 @@ app.use('/api/packages', packagesRouter);
 app.use('/api/audit', auditRouter);
 app.use('/api/portal', patientPortalRouter);
 app.use('/api/agent', agentRouter);
+app.use('/api/reminders', remindersRouter);
 // Error handlers will be mounted at the end of startServer
 
 // ============================================
