@@ -285,15 +285,32 @@ export const AdminDashboard: React.FC = () => {
     'Authorization': `Bearer ${localStorage.getItem('auth_token') || ''}`
   });
 
+  // Si el servidor rechaza el token (401/403), limpiar la sesión y volver al
+  // login. Devuelve true si se detectó un fallo de autenticación.
+  const handleAuthError = (res: Response | Response[]): boolean => {
+    const list = Array.isArray(res) ? res : [res];
+    if (list.some(r => r.status === 401 || r.status === 403)) {
+      localStorage.removeItem('auth_token');
+      localStorage.removeItem('auth_user');
+      // Mantener la vista en 'admin' para que la recarga muestre el login
+      // (y no la página pública) al expirar/invalidarse el token.
+      localStorage.setItem('current_view', 'admin');
+      window.location.reload();
+      return true;
+    }
+    return false;
+  };
+
   // Fetch de pacientes con filtro de estado y paginación
   const fetchPatients = async (page = 1, estado = estadoFiltro) => {
     const params = new URLSearchParams({ page: String(page), limit: '20' });
     if (estado !== 'Todos') params.set('estado', estado);
     const res = await fetch(`/api/patients?${params}`, { headers: getAuthHeaders() });
-    const result = await res.json();
-    setPatients(result.data);
-    setPatientsTotal(result.total);
-    setPatientsTotalPages(result.totalPages);
+    if (handleAuthError(res)) return;
+    const result = await res.json().catch(() => ({}));
+    setPatients(Array.isArray(result.data) ? result.data : []);
+    setPatientsTotal(result.total || 0);
+    setPatientsTotalPages(result.totalPages || 1);
     setPatientPage(page);
   };
 
@@ -353,7 +370,7 @@ export const AdminDashboard: React.FC = () => {
       try {
         setLoading(true);
 
-        const [patientsRes, sessionsRes, expensesRes, appointmentsRes, kpisRes, revenueRes, trendRes, statsRes] = await Promise.all([
+        const responses = await Promise.all([
           fetch('/api/patients', { headers: getAuthHeaders() }),
           fetch('/api/sessions', { headers: getAuthHeaders() }),
           fetch('/api/expenses', { headers: getAuthHeaders() }),
@@ -364,24 +381,36 @@ export const AdminDashboard: React.FC = () => {
           fetch('/api/finance/stats', { headers: getAuthHeaders() }),
         ]);
 
-        const patientsResult = await patientsRes.json();
-        const sessionsData = await sessionsRes.json();
-        const expensesData = await expensesRes.json();
-        const appointmentsData = await appointmentsRes.json();
-        const kpisData = await kpisRes.json();
-        const revenueData = await revenueRes.json();
-        const trendData = await trendRes.json();
-        const statsData = await statsRes.json();
+        // Si el token fue rechazado (expirado/inválido), volver al login de
+        // forma limpia en lugar de dejar el panel en blanco.
+        if (handleAuthError(responses)) return;
 
-        setPatients(patientsResult.data);
-        setPatientsTotal(patientsResult.total);
-        setPatientsTotalPages(patientsResult.totalPages);
-        setSessions(sessionsData);
-        setExpenses(expensesData);
-        setAppointments(appointmentsData);
-        setKpis(kpisData);
-        setRevenueByService(revenueData);
-        setNewPatientsTrend(trendData);
+        const [patientsRes, sessionsRes, expensesRes, appointmentsRes, kpisRes, revenueRes, trendRes, statsRes] = responses;
+
+        const patientsResult = await patientsRes.json().catch(() => ({}));
+        const sessionsData = await sessionsRes.json().catch(() => []);
+        const expensesData = await expensesRes.json().catch(() => []);
+        const appointmentsData = await appointmentsRes.json().catch(() => []);
+        const kpisData = await kpisRes.json().catch(() => ({}));
+        const revenueData = await revenueRes.json().catch(() => []);
+        const trendData = await trendRes.json().catch(() => []);
+        const statsData = await statsRes.json().catch(() => []);
+
+        // Guardas defensivas: una respuesta de error (429/500/{error})
+        // nunca debe dejar el estado en undefined y tronar el render.
+        setPatients(Array.isArray(patientsResult.data) ? patientsResult.data : []);
+        setPatientsTotal(patientsResult.total || 0);
+        setPatientsTotalPages(patientsResult.totalPages || 1);
+        setSessions(Array.isArray(sessionsData) ? sessionsData : []);
+        setExpenses(Array.isArray(expensesData) ? expensesData : []);
+        setAppointments(Array.isArray(appointmentsData) ? appointmentsData : []);
+        setKpis({
+          monthlyRevenue: kpisData?.monthlyRevenue || 0,
+          pendingAppointments: kpisData?.pendingAppointments || 0,
+          activePatients: kpisData?.activePatients || 0,
+        });
+        setRevenueByService(Array.isArray(revenueData) ? revenueData : []);
+        setNewPatientsTrend(Array.isArray(trendData) ? trendData : []);
         setMonthlyStats(Array.isArray(statsData) ? statsData : []);
       } catch (error) {
         console.error('Error cargando datos:', error);

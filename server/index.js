@@ -48,6 +48,13 @@ if (missingVars.length > 0) {
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Detrás de un proxy inverso (Coolify/Traefik/Nginx) confiamos en el primer
+// salto para obtener la IP real del cliente vía X-Forwarded-For. Sin esto,
+// express-rate-limit cuenta TODAS las peticiones bajo la IP del proxy y todos
+// los usuarios comparten el mismo cupo (10 logins/15min, 100 req/min),
+// devolviendo 429 y dejando fuera al admin al iniciar sesión.
+app.set('trust proxy', 1);
+
 // ============================================
 // MIDDLEWARE GLOBAL
 // ============================================
