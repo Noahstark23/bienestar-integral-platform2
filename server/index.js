@@ -31,7 +31,10 @@ import patientPortalRouter from './routes/patient-portal.js';
 import assessmentsRouter from './routes/assessments.js';
 import agentRouter from './routes/agent.js';
 import remindersRouter from './routes/reminders.js';
+import knowledgeRouter from './routes/knowledge.js';
+import documentsRouter from './routes/documents.js';
 import { startReminderJob } from './jobs/reminders.js';
+import rag from './lib/rag.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -91,6 +94,8 @@ app.use('/api/audit', auditRouter);
 app.use('/api/portal', patientPortalRouter);
 app.use('/api/agent', agentRouter);
 app.use('/api/reminders', remindersRouter);
+app.use('/api/knowledge', knowledgeRouter);
+app.use('/api/documents', documentsRouter);
 // Error handlers will be mounted at the end of startServer
 
 // ============================================
@@ -127,6 +132,7 @@ async function startServer() {
     app.listen(PORT, () => {
         logger.info(`Servidor corriendo en http://localhost:${PORT}`);
         startReminderJob();
+        rag.warmup(); // Pre-calienta el índice RAG sin bloquear el arranque
     });
 }
 

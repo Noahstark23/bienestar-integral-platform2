@@ -3,8 +3,12 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { authenticateToken } from '../middleware/auth.js';
 import prisma from '../lib/prisma.js';
 import logger from '../lib/logger.js';
+import rag from '../lib/rag.js';
+import { generateDocument, DOCUMENT_TYPES } from '../lib/documents.js';
 
 const router = Router();
+
+const FASES_PROCESO = ['EvaluacionInicial', 'Procesamiento', 'Perfil', 'Plan', 'Devolucion', 'Intervencion', 'Seguimiento', 'Alta'];
 
 // ============================================================
 // DEFINICIÓN DE HERRAMIENTAS (lo que Isabel puede hacer)
@@ -102,6 +106,44 @@ const TOOLS = [{
                 type: 'object',
                 properties: {
                     patientId: { type: 'number', description: 'ID del paciente' }
+                },
+                required: ['patientId']
+            }
+        },
+        {
+            name: 'consultar_base_conocimiento',
+            description: 'Consulta la base de conocimiento del consultorio: proceso clínico (flujograma de paciente nuevo), estructura del expediente (perfil clínico, plan de intervención, registro de sesiones, sesiones de seguimiento), protocolos (honorarios, duración, cancelaciones) y las plantillas (entrevista, historial clínico, consentimiento infantil, contrato adultos). Úsala SIEMPRE que te pregunten "qué sigue", "cómo es el proceso", "qué documentos", "cuánto cobro", "cómo registro", o por el contenido de cualquier plantilla.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    consulta: { type: 'string', description: 'La pregunta o tema a buscar en la base de conocimiento' }
+                },
+                required: ['consulta']
+            }
+        },
+        {
+            name: 'generar_documento',
+            description: 'Genera un documento clínico rellenado con los datos del paciente. Tipos válidos: contrato-adultos, consentimiento-infantil, entrevista, historial-clinico, perfil-clinico, plan-intervencion.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    patientId: { type: 'number', description: 'ID del paciente' },
+                    tipo: { type: 'string', enum: ['contrato-adultos', 'consentimiento-infantil', 'entrevista', 'historial-clinico', 'perfil-clinico', 'plan-intervencion'], description: 'Tipo de documento a generar' }
+                },
+                required: ['patientId', 'tipo']
+            }
+        },
+        {
+            name: 'actualizar_plan_clinico',
+            description: 'Guarda o actualiza en el expediente del paciente el análisis de pruebas, el perfil clínico, el plan de intervención y/o la fase del proceso clínico.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    patientId: { type: 'number', description: 'ID del paciente' },
+                    analisisPruebas: { type: 'string', description: 'Análisis de resultados de pruebas (opcional)' },
+                    perfilClinico: { type: 'string', description: 'Perfil clínico (opcional)' },
+                    planIntervencion: { type: 'string', description: 'Plan de intervención (opcional)' },
+                    faseProceso: { type: 'string', enum: FASES_PROCESO, description: 'Fase actual del proceso clínico (opcional)' }
                 },
                 required: ['patientId']
             }
@@ -220,6 +262,51 @@ async function executeTool(name, args) {
                 };
             }
 
+            case 'consultar_base_conocimiento': {
+                const results = await rag.retrieve(args.consulta, 5);
+                if (results.length === 0) return { resultados: [], nota: 'No se encontró información relevante en la base de conocimiento.' };
+                return {
+                    resultados: results.map(r => ({ documento: r.title, seccion: r.section, contenido: r.text }))
+                };
+            }
+
+            case 'generar_documento': {
+                const patient = await prisma.patient.findUnique({
+                    where: { id: args.patientId },
+                    include: { clinicalRecord: true, therapeuticGoals: { orderBy: { fechaInicio: 'asc' } } }
+                });
+                if (!patient) return { error: 'Paciente no encontrado' };
+                const doc = generateDocument(args.tipo, patient);
+                return {
+                    success: true,
+                    titulo: doc.titulo,
+                    paciente: patient.nombre,
+                    documento: doc.texto,
+                    nota: 'El documento también puede descargarse en PDF desde la pestaña "Documentos" del expediente.'
+                };
+            }
+
+            case 'actualizar_plan_clinico': {
+                const patientId = args.patientId;
+                const crData = {};
+                if (args.analisisPruebas !== undefined) crData.analisisPruebas = args.analisisPruebas;
+                if (args.perfilClinico !== undefined) crData.perfilClinico = args.perfilClinico;
+                if (args.planIntervencion !== undefined) crData.planIntervencion = args.planIntervencion;
+
+                if (Object.keys(crData).length > 0) {
+                    await prisma.clinicalRecord.upsert({
+                        where: { patientId },
+                        update: crData,
+                        create: { patientId, ...crData }
+                    });
+                }
+                if (args.faseProceso) {
+                    if (!FASES_PROCESO.includes(args.faseProceso)) return { error: `Fase inválida. Use una de: ${FASES_PROCESO.join(', ')}` };
+                    await prisma.patient.update({ where: { id: patientId }, data: { faseProceso: args.faseProceso } });
+                }
+                return { success: true, mensaje: 'Expediente clínico actualizado.' };
+            }
+
             default:
                 return { error: `Herramienta desconocida: ${name}` };
         }
@@ -291,13 +378,26 @@ CAPACIDADES:
 - ACTUALIZAR estado de citas (confirmar, cancelar)
 - AGREGAR metas terapéuticas a pacientes
 - VER historial completo de un paciente
+- CONOCES el proceso clínico del consultorio, la estructura del expediente y las plantillas (consulta_base_conocimiento)
+- GENERAR documentos clínicos por paciente (generar_documento)
+- ACTUALIZAR el perfil clínico, plan de intervención y fase del proceso (actualizar_plan_clinico)
+
+PROCESO CLÍNICO DE LA LIC. ESMIRNA (úsalo para orientar "qué sigue"):
+1) Paciente nuevo → Primera sesión: entrevista, historia clínica, consentimiento, motivo de consulta, antecedentes; si hay tiempo, pruebas iniciales.
+2) Segunda sesión: continuar entrevista y aplicar pruebas.
+3) Procesamiento de resultados → 4) Triangulación → 5) Perfil clínico → 6) Plan de intervención (objetivos jerárquicos).
+7) Tercera sesión: devolución de resultados, perfil y plan, acuerdos.
+8) Intervención por objetivos (cada sesión va en "Registro de sesiones" siguiendo el plan).
+9) Alta. Tras el alta, las sesiones de mantenimiento son "Sesiones de seguimiento" (categoría Seguimiento), separadas del registro.
 
 FLUJO CUANDO TE PIDAN HACER ALGO:
 1. Si necesitas el ID de un paciente, primero usa buscar_paciente
-2. Luego ejecuta la acción correspondiente
-3. Confirma lo que hiciste de forma clara y concisa
+2. Si te preguntan por el proceso, protocolos o plantillas, usa consultar_base_conocimiento ANTES de responder
+3. Luego ejecuta la acción correspondiente
+4. Confirma lo que hiciste de forma clara y concisa
 
 REGLAS:
+- Cuando respondas sobre el proceso o las plantillas, apóyate en la base de conocimiento; no inventes honorarios, duraciones ni pasos.
 - Siempre confirma las acciones importantes antes de ejecutarlas si hay ambigüedad en datos críticos (fecha, nombre exacto)
 - Si falta información esencial, pregúntala de forma concisa
 - Responde siempre en español
@@ -352,7 +452,19 @@ router.post('/chat', authenticateToken, async (req, res) => {
 
         const chat = model.startChat({ history: geminiHistory });
 
-        let result = await chat.sendMessage(message);
+        // RAG: recuperar conocimiento relevante (proceso, protocolos, plantillas)
+        // y fundamentar la respuesta sin contaminar el historial mostrado al usuario.
+        let groundedMessage = message;
+        try {
+            const contexto = await rag.buildContext(message, 4);
+            if (contexto) {
+                groundedMessage = `${message}\n\n[CONOCIMIENTO DEL CONSULTORIO — base para tu respuesta cuando sea pertinente; no lo cites textualmente]\n${contexto}`;
+            }
+        } catch (err) {
+            logger.warn?.(`RAG context: ${err.message}`);
+        }
+
+        let result = await chat.sendMessage(groundedMessage);
 
         // Loop de function calling — Gemini puede llamar múltiples herramientas
         let iterations = 0;

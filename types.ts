@@ -15,6 +15,11 @@ export interface Patient {
   estadoCivil?: string;
   escolaridad?: string;
   fechaNacimiento?: string;
+  tutorNombre?: string;
+  tutorRelacion?: string;
+
+  // Fase del proceso clínico
+  faseProceso?: string; // EvaluacionInicial | Procesamiento | Perfil | Plan | Devolucion | Intervencion | Seguimiento | Alta
 
   createdAt: string; // DateTime string ISO
   clinicalRecord?: ClinicalRecord;
@@ -28,6 +33,10 @@ export interface ClinicalRecord {
   antecedentesFamiliares: string;
   historiaDesarrollo: string;
   diagnostico: string;
+  // Integración del proceso clínico
+  analisisPruebas?: string;
+  perfilClinico?: string;
+  planIntervencion?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -42,6 +51,24 @@ export interface Session {
   estadoPago: 'Pendiente' | 'Pagado';
   tipo?: string; // 'Evaluacion' | 'Terapia' | 'Orientacion'
   resumen?: string; // SOAP notes
+  categoria?: 'Registro' | 'Seguimiento';
+  objetivoTrabajado?: string;
+  tecnicas?: string;
+}
+
+export interface ClinicalDocumentSection {
+  heading: string;
+  lines: string[];
+}
+
+export interface ClinicalDocument {
+  tipo: string;
+  titulo: string;
+  paciente: { id: number; nombre: string };
+  fecha: string;
+  profesional: { nombre: string; codigoMinsa: string; consultorio: string };
+  secciones: ClinicalDocumentSection[];
+  texto: string;
 }
 
 export interface Expense {

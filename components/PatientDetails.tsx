@@ -1,6 +1,6 @@
 ﻿import React, { useState, useEffect } from 'react';
-import { X, User, FileText, Clock, Save, Edit2, CheckCircle, Target, Plus, AlertTriangle, XCircle, Pencil, Package, BarChart2 } from 'lucide-react';
-import { Patient, ClinicalRecord, Session } from '../types';
+import { X, User, FileText, Clock, Save, Edit2, CheckCircle, Target, Plus, AlertTriangle, XCircle, Pencil, Package, BarChart2, ClipboardList, Download, FileSignature, Loader2 } from 'lucide-react';
+import { Patient, ClinicalRecord, Session, ClinicalDocument } from '../types';
 import { AssessmentPanel } from './AssessmentPanel';
 
 interface PatientDetailsProps {
@@ -8,7 +8,28 @@ interface PatientDetailsProps {
     onClose: () => void;
 }
 
-type TabType = 'general' | 'clinical' | 'timeline' | 'goals' | 'packages' | 'escalas';
+type TabType = 'general' | 'clinical' | 'plan' | 'timeline' | 'goals' | 'documentos' | 'packages' | 'escalas';
+
+const FASES_PROCESO = ['EvaluacionInicial', 'Procesamiento', 'Perfil', 'Plan', 'Devolucion', 'Intervencion', 'Seguimiento', 'Alta'];
+const FASE_LABEL: Record<string, string> = {
+    EvaluacionInicial: 'Evaluación inicial',
+    Procesamiento: 'Procesamiento de resultados',
+    Perfil: 'Elaboración del perfil clínico',
+    Plan: 'Diseño del plan de intervención',
+    Devolucion: 'Devolución (3ª sesión)',
+    Intervencion: 'Intervención terapéutica',
+    Seguimiento: 'Sesiones de seguimiento',
+    Alta: 'Alta / cierre',
+};
+
+const DOCUMENTOS: { tipo: string; titulo: string; desc: string }[] = [
+    { tipo: 'historial-clinico', titulo: 'Historial Clínico (Anamnesis)', desc: 'Historia completa del paciente' },
+    { tipo: 'entrevista', titulo: 'Entrevista Psicológica', desc: 'Formato de primera sesión' },
+    { tipo: 'contrato-adultos', titulo: 'Contrato Terapéutico (Adultos)', desc: 'Consentimiento informado, mayores de edad' },
+    { tipo: 'consentimiento-infantil', titulo: 'Asentimiento Informado (Infantil)', desc: 'Consentimiento del representante legal' },
+    { tipo: 'perfil-clinico', titulo: 'Perfil Clínico', desc: 'Resultados, perfil e impresión diagnóstica' },
+    { tipo: 'plan-intervencion', titulo: 'Plan de Intervención', desc: 'Objetivos jerárquicos y técnicas' },
+];
 
 interface Goal {
     id: number;
@@ -40,6 +61,19 @@ export const PatientDetails: React.FC<PatientDetailsProps> = ({ patientId, onClo
         historiaDesarrollo: '',
         diagnostico: ''
     });
+
+    // Plan clínico (perfil, plan de intervención, análisis de pruebas, fase)
+    const [editingPlan, setEditingPlan] = useState(false);
+    const [planData, setPlanData] = useState({
+        analisisPruebas: '',
+        perfilClinico: '',
+        planIntervencion: '',
+        faseProceso: 'EvaluacionInicial'
+    });
+
+    // Documentos
+    const [docLoading, setDocLoading] = useState<string | null>(null);
+    const [previewDoc, setPreviewDoc] = useState<ClinicalDocument | null>(null);
 
     // General info editing
     const [editingGeneral, setEditingGeneral] = useState(false);
@@ -90,6 +124,12 @@ export const PatientDetails: React.FC<PatientDetailsProps> = ({ patientId, onClo
             const data = await response.json();
             setPatient(data);
             if (data.clinicalRecord) setClinicalData(data.clinicalRecord);
+            setPlanData({
+                analisisPruebas: data.clinicalRecord?.analisisPruebas || '',
+                perfilClinico: data.clinicalRecord?.perfilClinico || '',
+                planIntervencion: data.clinicalRecord?.planIntervencion || '',
+                faseProceso: data.faseProceso || 'EvaluacionInicial'
+            });
             setGeneralData({
                 nombre: data.nombre || '',
                 edad: String(data.edad || ''),
@@ -178,6 +218,94 @@ export const PatientDetails: React.FC<PatientDetailsProps> = ({ patientId, onClo
         } finally {
             setSaving(false);
         }
+    };
+
+    const handleSavePlan = async () => {
+        try {
+            setSaving(true);
+            // 1) Guardar campos clínicos (perfil, plan, análisis)
+            const method = patient?.clinicalRecord ? 'PUT' : 'POST';
+            const resCr = await fetch(`/api/patients/${patientId}/clinical-record`, {
+                method,
+                headers: getAuthHeaders(),
+                body: JSON.stringify({
+                    analisisPruebas: planData.analisisPruebas,
+                    perfilClinico: planData.perfilClinico,
+                    planIntervencion: planData.planIntervencion
+                })
+            });
+            if (!resCr.ok) throw new Error('clinical');
+            // 2) Guardar fase del proceso en el paciente
+            const resP = await fetch(`/api/patients/${patientId}`, {
+                method: 'PUT',
+                headers: getAuthHeaders(),
+                body: JSON.stringify({ faseProceso: planData.faseProceso })
+            });
+            if (!resP.ok) throw new Error('fase');
+            await loadPatientData();
+            setEditingPlan(false);
+        } catch (err) {
+            setError('Error guardando el plan clínico.');
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const fetchDocument = async (tipo: string): Promise<ClinicalDocument | null> => {
+        const res = await fetch(`/api/documents/patient/${patientId}/${tipo}`, { headers: getAuthHeaders() });
+        if (!res.ok) { setError('No se pudo generar el documento.'); return null; }
+        return res.json();
+    };
+
+    const handleDownloadPdf = async (tipo: string) => {
+        try {
+            setDocLoading(tipo);
+            const doc = await fetchDocument(tipo);
+            if (!doc) return;
+            const { jsPDF } = await import('jspdf');
+            const pdf = new jsPDF();
+            const pageW = pdf.internal.pageSize.getWidth();
+            const pageH = pdf.internal.pageSize.getHeight();
+            const marginX = 15;
+            const maxW = pageW - marginX * 2;
+            let y = 16;
+            const ensureSpace = (h: number) => { if (y + h > pageH - 15) { pdf.addPage(); y = 16; } };
+
+            pdf.setFont('helvetica', 'bold'); pdf.setFontSize(14);
+            pdf.text(doc.titulo, pageW / 2, y, { align: 'center' }); y += 6;
+            pdf.setFont('helvetica', 'normal'); pdf.setFontSize(9);
+            pdf.text(doc.profesional?.consultorio || '', pageW / 2, y, { align: 'center' }); y += 5;
+            pdf.text(`${doc.paciente?.nombre || ''}  ·  ${new Date(doc.fecha).toLocaleDateString('es-NI')}`, pageW / 2, y, { align: 'center' }); y += 8;
+
+            for (const sec of doc.secciones) {
+                if (sec.heading) {
+                    ensureSpace(8);
+                    pdf.setFont('helvetica', 'bold'); pdf.setFontSize(11);
+                    const hl = pdf.splitTextToSize(sec.heading, maxW);
+                    pdf.text(hl, marginX, y); y += hl.length * 5 + 1;
+                }
+                pdf.setFont('helvetica', 'normal'); pdf.setFontSize(10);
+                for (const line of sec.lines) {
+                    const wrapped = pdf.splitTextToSize(line || ' ', maxW);
+                    ensureSpace(wrapped.length * 5);
+                    pdf.text(wrapped, marginX, y); y += wrapped.length * 5;
+                }
+                y += 3;
+            }
+            const safeName = (doc.paciente?.nombre || 'paciente').replace(/\s+/g, '_');
+            pdf.save(`${tipo}-${safeName}.pdf`);
+        } catch (err) {
+            setError('Error generando el PDF.');
+        } finally {
+            setDocLoading(null);
+        }
+    };
+
+    const handlePreviewDoc = async (tipo: string) => {
+        setDocLoading(tipo);
+        const doc = await fetchDocument(tipo);
+        if (doc) setPreviewDoc(doc);
+        setDocLoading(null);
     };
 
     const handleSaveSoap = async (sessionId: number) => {
@@ -287,8 +415,10 @@ export const PatientDetails: React.FC<PatientDetailsProps> = ({ patientId, onClo
     const TABS = [
         { id: 'general', label: 'General', icon: <User size={16} /> },
         { id: 'clinical', label: 'Clínica', icon: <FileText size={16} /> },
+        { id: 'plan', label: 'Plan', icon: <ClipboardList size={16} /> },
         { id: 'timeline', label: 'Historial', icon: <Clock size={16} /> },
         { id: 'goals', label: 'Objetivos', icon: <Target size={16} /> },
+        { id: 'documentos', label: 'Documentos', icon: <FileSignature size={16} /> },
         { id: 'packages', label: 'Paquetes', icon: <Package size={16} /> },
         { id: 'escalas', label: 'Escalas', icon: <BarChart2 size={16} /> }
     ] as const;
@@ -333,7 +463,14 @@ export const PatientDetails: React.FC<PatientDetailsProps> = ({ patientId, onClo
                                     </span>
                                 )}
                             </div>
-                            <p className="text-brand-100 text-sm mt-1">Expediente Clínico #{patient.id}</p>
+                            <p className="text-brand-100 text-sm mt-1">
+                                Expediente Clínico #{patient.id}
+                                {patient.faseProceso && (
+                                    <span className="ml-2 bg-white/15 text-white text-xs px-2 py-0.5 rounded-full">
+                                        Fase: {FASE_LABEL[patient.faseProceso] || patient.faseProceso}
+                                    </span>
+                                )}
+                            </p>
                             {isAlta && (
                                 <p className="text-brand-200 text-xs mt-1">
                                     Alta: {new Date(patient.fechaAlta).toLocaleDateString('es-NI')} — {patient.motivoAlta}
@@ -545,6 +682,71 @@ export const PatientDetails: React.FC<PatientDetailsProps> = ({ patientId, onClo
                                     </div>
                                 </>
                             )}
+                        </div>
+                    )}
+
+                    {/* ── TAB: PLAN CLÍNICO ── */}
+                    {activeTab === 'plan' && (
+                        <div className="space-y-5">
+                            <div className="flex justify-between items-center">
+                                <h3 className="text-lg font-bold text-slate-800">Perfil clínico y plan de intervención</h3>
+                                {!editingPlan ? (
+                                    <button onClick={() => setEditingPlan(true)} className="flex items-center gap-2 px-4 py-2 text-brand-600 hover:bg-brand-50 rounded-lg transition-colors text-sm font-medium">
+                                        <Edit2 size={15} /> Editar
+                                    </button>
+                                ) : (
+                                    <div className="flex gap-2">
+                                        <button onClick={() => { setEditingPlan(false); setPlanData({ analisisPruebas: patient.clinicalRecord?.analisisPruebas || '', perfilClinico: patient.clinicalRecord?.perfilClinico || '', planIntervencion: patient.clinicalRecord?.planIntervencion || '', faseProceso: patient.faseProceso || 'EvaluacionInicial' }); }} className="px-4 py-2 border border-slate-300 rounded-lg text-sm hover:bg-slate-50">Cancelar</button>
+                                        <button onClick={handleSavePlan} disabled={saving} className="flex items-center gap-2 px-4 py-2 bg-brand-600 text-white rounded-lg text-sm hover:bg-brand-700 disabled:opacity-50">
+                                            <Save size={15} /> {saving ? 'Guardando...' : 'Guardar'}
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Fase del proceso */}
+                            <div>
+                                <label className="block text-sm font-semibold text-slate-700 mb-2">Fase del proceso clínico</label>
+                                {editingPlan ? (
+                                    <select
+                                        value={planData.faseProceso}
+                                        onChange={e => setPlanData({ ...planData, faseProceso: e.target.value })}
+                                        className="w-full md:w-1/2 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                                    >
+                                        {FASES_PROCESO.map(f => <option key={f} value={f}>{FASE_LABEL[f]}</option>)}
+                                    </select>
+                                ) : (
+                                    <p className="text-slate-700 bg-brand-50 border border-brand-100 px-4 py-2 rounded-lg text-sm inline-block">
+                                        {FASE_LABEL[planData.faseProceso] || planData.faseProceso}
+                                    </p>
+                                )}
+                            </div>
+
+                            {[
+                                { label: 'Análisis de resultados de pruebas', key: 'analisisPruebas', placeholder: 'Calificación, corrección e interpretación integrada de las pruebas aplicadas...' },
+                                { label: 'Perfil clínico (triangulación)', key: 'perfilClinico', placeholder: 'Descripción integrada del caso: fortalezas, dificultades, áreas afectadas, impresión diagnóstica...' },
+                                { label: 'Plan de intervención', key: 'planIntervencion', placeholder: 'Priorización de problemáticas, enfoques, técnicas y organización jerárquica de objetivos...' }
+                            ].map(field => (
+                                <div key={field.key}>
+                                    <label className="block text-sm font-semibold text-slate-700 mb-2">{field.label}</label>
+                                    {editingPlan ? (
+                                        <textarea
+                                            value={(planData as any)[field.key]}
+                                            onChange={e => setPlanData({ ...planData, [field.key]: e.target.value })}
+                                            className="w-full h-32 px-4 py-3 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 text-sm"
+                                            placeholder={field.placeholder}
+                                        />
+                                    ) : (
+                                        <p className="text-slate-600 bg-slate-50 p-4 rounded-lg text-sm leading-relaxed whitespace-pre-wrap">
+                                            {(planData as any)[field.key] || <span className="text-slate-400 italic">Sin información</span>}
+                                        </p>
+                                    )}
+                                </div>
+                            ))}
+
+                            <p className="text-xs text-slate-400">
+                                Los objetivos terapéuticos jerárquicos se gestionan en la pestaña <strong>Objetivos</strong>. El plan de intervención guía el <strong>Registro de sesiones</strong>; tras el alta, las sesiones de mantenimiento se marcan como <strong>Seguimiento</strong>.
+                            </p>
                         </div>
                     )}
 
@@ -795,6 +997,47 @@ export const PatientDetails: React.FC<PatientDetailsProps> = ({ patientId, onClo
                         </div>
                     )}
 
+                    {/* ── DOCUMENTOS TAB ── */}
+                    {activeTab === 'documentos' && (
+                        <div className="space-y-4">
+                            <div>
+                                <h3 className="text-lg font-bold text-slate-800">Documentos clínicos</h3>
+                                <p className="text-sm text-slate-500 mt-1">Plantillas del consultorio rellenadas con los datos de {patient.nombre}. Descárgalas en PDF o previsualízalas.</p>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                {DOCUMENTOS.map(d => (
+                                    <div key={d.tipo} className="border border-slate-200 rounded-xl p-4 flex flex-col justify-between hover:shadow-md transition-shadow">
+                                        <div className="flex items-start gap-3">
+                                            <div className="w-9 h-9 bg-brand-50 rounded-lg flex items-center justify-center shrink-0">
+                                                <FileSignature size={18} className="text-brand-600" />
+                                            </div>
+                                            <div>
+                                                <h4 className="font-semibold text-slate-800 text-sm">{d.titulo}</h4>
+                                                <p className="text-xs text-slate-500 mt-0.5">{d.desc}</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex gap-2 mt-4">
+                                            <button
+                                                onClick={() => handlePreviewDoc(d.tipo)}
+                                                disabled={docLoading === d.tipo}
+                                                className="flex-1 px-3 py-1.5 border border-slate-300 text-slate-700 rounded-lg text-xs hover:bg-slate-50 disabled:opacity-50 flex items-center justify-center gap-1.5"
+                                            >
+                                                {docLoading === d.tipo ? <Loader2 size={13} className="animate-spin" /> : <FileText size={13} />} Vista previa
+                                            </button>
+                                            <button
+                                                onClick={() => handleDownloadPdf(d.tipo)}
+                                                disabled={docLoading === d.tipo}
+                                                className="flex-1 px-3 py-1.5 bg-brand-600 text-white rounded-lg text-xs hover:bg-brand-700 disabled:opacity-50 flex items-center justify-center gap-1.5"
+                                            >
+                                                <Download size={13} /> PDF
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
                     {/* ── PACKAGES TAB ── */}
                     {activeTab === 'packages' && (
                         <div className="space-y-4">
@@ -881,6 +1124,37 @@ export const PatientDetails: React.FC<PatientDetailsProps> = ({ patientId, onClo
                         <AssessmentPanel patientId={patientId} />
                     )}
                 </div>
+
+                {/* Document Preview Modal */}
+                {previewDoc && (
+                    <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-20 rounded-2xl p-4" onClick={() => setPreviewDoc(null)}>
+                        <div className="bg-white rounded-xl w-full max-w-2xl max-h-[85vh] flex flex-col shadow-2xl" onClick={e => e.stopPropagation()}>
+                            <div className="flex justify-between items-center px-5 py-4 border-b border-slate-100">
+                                <div>
+                                    <h4 className="font-bold text-slate-800">{previewDoc.titulo}</h4>
+                                    <p className="text-xs text-slate-500">{previewDoc.paciente?.nombre} · {new Date(previewDoc.fecha).toLocaleDateString('es-NI')}</p>
+                                </div>
+                                <button onClick={() => setPreviewDoc(null)} className="text-slate-400 hover:text-slate-600 p-1"><X size={20} /></button>
+                            </div>
+                            <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+                                {previewDoc.secciones.map((sec, i) => (
+                                    <div key={i}>
+                                        {sec.heading && <p className="font-semibold text-slate-800 text-sm mb-1">{sec.heading}</p>}
+                                        {sec.lines.map((line, j) => (
+                                            <p key={j} className="text-sm text-slate-600 whitespace-pre-wrap leading-relaxed">{line || ' '}</p>
+                                        ))}
+                                    </div>
+                                ))}
+                            </div>
+                            <div className="px-5 py-3 border-t border-slate-100 flex justify-end gap-2">
+                                <button onClick={() => setPreviewDoc(null)} className="px-4 py-2 border border-slate-300 rounded-lg text-sm hover:bg-slate-50">Cerrar</button>
+                                <button onClick={() => handleDownloadPdf(previewDoc.tipo)} className="px-4 py-2 bg-brand-600 text-white rounded-lg text-sm hover:bg-brand-700 flex items-center gap-1.5">
+                                    <Download size={14} /> Descargar PDF
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 {/* Discharge Confirm Modal */}
                 {showDischargeConfirm && (

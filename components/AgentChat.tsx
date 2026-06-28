@@ -13,9 +13,9 @@ interface AgentChatProps {
 
 const QUICK_ACTIONS = [
   'Resumen de hoy',
-  'Citas de mañana',
   'Solicitudes pendientes',
-  'Pacientes activos',
+  '¿Qué hago en la primera sesión?',
+  'Honorarios y duración de sesiones',
 ];
 
 export const AgentChat: React.FC<AgentChatProps> = ({ token, userName }) => {

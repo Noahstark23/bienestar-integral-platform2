@@ -40,3 +40,6 @@ prisma/**/*.db-wal
 *.backup
 payload.json
 
+# RAG — índice de embeddings (se regenera en runtime)
+server/knowledge/.rag-index.json
+
