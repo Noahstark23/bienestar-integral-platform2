@@ -140,7 +140,10 @@ router.post('/:id/discharge', async (req, res, next) => {
 // POST /api/patients/:id/clinical-record
 router.post('/:id/clinical-record', async (req, res, next) => {
     try {
-        const { antecedentesMedicos, antecedentesFamiliares, historiaDesarrollo, diagnostico } = req.body;
+        const {
+            antecedentesMedicos, antecedentesFamiliares, historiaDesarrollo, diagnostico,
+            analisisPruebas, perfilClinico, planIntervencion
+        } = req.body;
 
         const clinicalRecord = await prisma.clinicalRecord.create({
             data: {
@@ -148,7 +151,10 @@ router.post('/:id/clinical-record', async (req, res, next) => {
                 antecedentesMedicos: antecedentesMedicos || '',
                 antecedentesFamiliares: antecedentesFamiliares || '',
                 historiaDesarrollo: historiaDesarrollo || '',
-                diagnostico: diagnostico || ''
+                diagnostico: diagnostico || '',
+                analisisPruebas: analisisPruebas || '',
+                perfilClinico: perfilClinico || '',
+                planIntervencion: planIntervencion || ''
             }
         });
 
@@ -162,22 +168,16 @@ router.post('/:id/clinical-record', async (req, res, next) => {
 // PUT /api/patients/:id/clinical-record
 router.put('/:id/clinical-record', async (req, res, next) => {
     try {
-        const { antecedentesMedicos, antecedentesFamiliares, historiaDesarrollo, diagnostico } = req.body;
         const patientId = parseInt(req.params.id);
-
         const existing = await prisma.clinicalRecord.findUnique({ where: { patientId } });
         if (!existing) return res.status(404).json({ error: 'Expediente clínico no encontrado' });
 
-        const updated = await prisma.clinicalRecord.update({
-            where: { patientId },
-            data: {
-                antecedentesMedicos: antecedentesMedicos || existing.antecedentesMedicos,
-                antecedentesFamiliares: antecedentesFamiliares || existing.antecedentesFamiliares,
-                historiaDesarrollo: historiaDesarrollo || existing.historiaDesarrollo,
-                diagnostico: diagnostico || existing.diagnostico
-            }
-        });
+        // Solo se actualizan los campos enviados (permite limpiar con cadena vacía)
+        const CAMPOS = ['antecedentesMedicos', 'antecedentesFamiliares', 'historiaDesarrollo', 'diagnostico', 'analisisPruebas', 'perfilClinico', 'planIntervencion'];
+        const data = {};
+        for (const c of CAMPOS) if (req.body[c] !== undefined) data[c] = req.body[c];
 
+        const updated = await prisma.clinicalRecord.update({ where: { patientId }, data });
         res.json(updated);
     } catch (err) {
         logger.error('PUT /api/patients/:id/clinical-record', err);

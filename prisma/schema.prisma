@@ -48,6 +48,10 @@ model Patient {
   estado            String    @default("Activo")  // "Activo", "En Pausa", "Alta"
   fechaAlta         DateTime?
   motivoAlta        String    @default("")
+
+  // Fase del proceso clínico (flujo de trabajo de la psicóloga)
+  // "EvaluacionInicial" | "Procesamiento" | "Perfil" | "Plan" | "Devolucion" | "Intervencion" | "Seguimiento" | "Alta"
+  faseProceso       String    @default("EvaluacionInicial")
   
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
@@ -74,6 +78,12 @@ model ClinicalRecord {
   antecedentesFamiliares  String   @default("")
   historiaDesarrollo      String   @default("")
   diagnostico             String   @default("")
+
+  // Integración del proceso clínico (carpeta del paciente)
+  analisisPruebas         String   @default("")  // Análisis de resultados de pruebas psicológicas
+  perfilClinico           String   @default("")  // Perfil clínico (triangulación de información)
+  planIntervencion        String   @default("")  // Plan de intervención (objetivos jerárquicos, enfoques, técnicas)
+
   createdAt               DateTime @default(now())
   updatedAt               DateTime @updatedAt
   
@@ -91,6 +101,12 @@ model Session {
   pago          Float
   estadoPago    String      @default("Pendiente")
   tipo          String      @default("Terapia")  // "Evaluacion", "Terapia", "Consulta"
+
+  // Clasificación del registro de sesiones
+  // "Registro" = sesión del plan de intervención | "Seguimiento" = sesión de mantenimiento (post-alta del plan)
+  categoria        String   @default("Registro")
+  objetivoTrabajado String  @default("")  // Objetivo del plan de intervención trabajado en la sesión
+  tecnicas         String   @default("")  // Técnicas / herramientas clínicas aplicadas
   
   // SOAP Notes Structure (replacing simple "notas")
   notaSubjetiva String      @default("")  // S: What the patient says
