@@ -60,7 +60,10 @@ export const AddPatientModal: React.FC<AddPatientModalProps> = ({ onClose, onSuc
 
             const response = await fetch('/api/patients', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('auth_token') || ''}`
+                },
                 body: JSON.stringify({
                     ...formData,
                     edad: parseInt(formData.edad)
@@ -68,15 +71,16 @@ export const AddPatientModal: React.FC<AddPatientModalProps> = ({ onClose, onSuc
             });
 
             if (!response.ok) {
-                throw new Error('Error al crear paciente');
+                const data = await response.json().catch(() => ({}));
+                throw new Error(data.error || `Error al crear paciente (${response.status})`);
             }
 
             // Éxito
             onSuccess();
             onClose();
-        } catch (err) {
+        } catch (err: any) {
             console.error('Error creating patient:', err);
-            setError('Error al crear paciente. Por favor intenta de nuevo.');
+            setError(err?.message || 'Error al crear paciente. Por favor intenta de nuevo.');
         } finally {
             setLoading(false);
         }
