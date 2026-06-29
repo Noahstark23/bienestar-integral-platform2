@@ -53,9 +53,15 @@ RUN chmod +x docker-entrypoint.sh
 # Install netcat for DB health check and openssl for Prisma
 RUN apk add --no-cache netcat-openbsd openssl
 
-# Non-root user for security
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup
-RUN chown -R appuser:appgroup /app
+# Usuario no-root por seguridad.
+# NO hacemos `chown -R /app`: recorrería y DUPLICARÍA todo node_modules en una
+# capa enorme (llena el disco del droplet de 1GB y es lentísimo — rompía el
+# build en este paso). Los archivos quedan de root pero legibles/ejecutables
+# por todos (perms por defecto de npm/prisma). Solo damos escritura a
+# server/knowledge, único lugar donde el servidor escribe en runtime (el caché
+# del índice RAG; además tolera fallos de escritura).
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup \
+    && chown -R appuser:appgroup /app/server/knowledge
 USER appuser
 
 EXPOSE 3000
