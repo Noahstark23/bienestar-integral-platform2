@@ -56,17 +56,19 @@ export const AgentChat: React.FC<AgentChatProps> = ({ token, userName }) => {
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || 'Error del servidor');
+        const detail = err.detail ? ` — ${err.detail}` : '';
+        throw new Error(`${err.error || 'Error del servidor'}${detail}`);
       }
 
       const data = await res.json();
       setMessages(prev => [...prev, { role: 'assistant', text: data.reply }]);
     } catch (err: any) {
+      const msg: string = err?.message || '';
       setMessages(prev => [...prev, {
         role: 'assistant',
-        text: err.message?.includes('GEMINI_API_KEY')
+        text: msg.includes('GEMINI_API_KEY')
           ? 'GEMINI_API_KEY no está configurada en Coolify. Agrégala en las variables de entorno.'
-          : 'Tuve un problema. Intenta de nuevo.'
+          : `Tuve un problema. ${msg || 'Intenta de nuevo.'}`
       }]);
     } finally {
       setIsLoading(false);

@@ -10,6 +10,10 @@ const router = Router();
 
 const FASES_PROCESO = ['EvaluacionInicial', 'Procesamiento', 'Perfil', 'Plan', 'Devolucion', 'Intervencion', 'Seguimiento', 'Alta'];
 
+// Modelo de Gemini para Isabel. Configurable por entorno para no depender de
+// versiones que Google retira (p. ej. gemini-1.5-flash quedó deprecado).
+const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
+
 // ============================================================
 // DEFINICIÓN DE HERRAMIENTAS (lo que Isabel puede hacer)
 // ============================================================
@@ -421,7 +425,7 @@ router.post('/chat', authenticateToken, async (req, res) => {
 
         const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
         const model = genAI.getGenerativeModel({
-            model: 'gemini-1.5-flash',
+            model: GEMINI_MODEL,
             systemInstruction: SYSTEM_PROMPT,
             tools: TOOLS
         });
@@ -495,7 +499,13 @@ router.post('/chat', authenticateToken, async (req, res) => {
 
     } catch (err) {
         logger.error('POST /api/agent/chat', err);
-        res.status(500).json({ error: 'Error al procesar tu mensaje. Intenta de nuevo.' });
+        // Endpoint solo para admin autenticado: devolvemos el detalle real del
+        // error (modelo retirado, cuota, etc.) para poder diagnosticar.
+        res.status(500).json({
+            error: 'Error al procesar tu mensaje. Intenta de nuevo.',
+            detail: err?.message || String(err),
+            modelo: GEMINI_MODEL
+        });
     }
 });
 
