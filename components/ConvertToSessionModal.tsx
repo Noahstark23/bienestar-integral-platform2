@@ -37,7 +37,10 @@ export const ConvertToSessionModal: React.FC<Props> = ({ appointment, onClose, o
         try {
             const res = await fetch(`/api/appointments/${appointment.id}/convert-to-session`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('auth_token') || ''}`
+                },
                 body: JSON.stringify({
                     pago: pagoNum,
                     tipo,

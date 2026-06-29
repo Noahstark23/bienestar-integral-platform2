@@ -92,7 +92,10 @@ export const InvoiceDetails: React.FC<Props> = ({ invoice, onClose, onUpdate, on
         setDeletingPaymentId(paymentId);
         try {
             const res = await fetch(`/api/payments/${paymentId}`, {
-                method: 'DELETE'
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('auth_token') || ''}`
+                }
             });
 
             if (res.ok) {

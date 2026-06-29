@@ -24,6 +24,12 @@ interface VirtualSessionData {
 
 const DAYS = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
 
+// Cabeceras con token JWT (las rutas admin de telemedicina requieren autenticación)
+const authHeaders = () => ({
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${localStorage.getItem('auth_token') || ''}`
+});
+
 interface Props {
     onJoinAsDoctor: (roomName: string) => void;
 }
@@ -53,21 +59,21 @@ export const VirtualSessionManager: React.FC<Props> = ({ onJoinAsDoctor }) => {
 
     const fetchSlots = async () => {
         try {
-            const res = await fetch('/api/telmed/availability');
+            const res = await fetch('/api/telmed/availability', { headers: authHeaders() });
             if (res.ok) setSlots(await res.json());
         } catch (e) { console.error(e); }
     };
 
     const fetchSessions = async () => {
         try {
-            const res = await fetch('/api/virtual-sessions');
+            const res = await fetch('/api/virtual-sessions', { headers: authHeaders() });
             if (res.ok) setSessions(await res.json());
         } catch (e) { console.error(e); }
     };
 
     const fetchPatients = async () => {
         try {
-            const res = await fetch('/api/patients');
+            const res = await fetch('/api/patients', { headers: authHeaders() });
             if (res.ok) setPatients(await res.json());
         } catch (e) { console.error(e); }
     };
@@ -77,7 +83,7 @@ export const VirtualSessionManager: React.FC<Props> = ({ onJoinAsDoctor }) => {
         try {
             const res = await fetch('/api/telmed/availability', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: authHeaders(),
                 body: JSON.stringify(newSlot)
             });
             if (res.ok) {
@@ -90,7 +96,7 @@ export const VirtualSessionManager: React.FC<Props> = ({ onJoinAsDoctor }) => {
     const handleDeleteSlot = async (id: number) => {
         if (!confirm('¿Eliminar este horario?')) return;
         try {
-            await fetch(`/api/telmed/availability/${id}`, { method: 'DELETE' });
+            await fetch(`/api/telmed/availability/${id}`, { method: 'DELETE', headers: authHeaders() });
             fetchSlots();
         } catch (e) { console.error(e); }
     };
@@ -109,7 +115,7 @@ export const VirtualSessionManager: React.FC<Props> = ({ onJoinAsDoctor }) => {
         try {
             const res = await fetch('/api/virtual-sessions', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: authHeaders(),
                 body: JSON.stringify(data)
             });
             if (res.ok) {
@@ -128,7 +134,7 @@ export const VirtualSessionManager: React.FC<Props> = ({ onJoinAsDoctor }) => {
         try {
             await fetch(`/api/virtual-sessions/${id}`, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
+                headers: authHeaders(),
                 body: JSON.stringify({ estado })
             });
             fetchSessions();
@@ -138,7 +144,7 @@ export const VirtualSessionManager: React.FC<Props> = ({ onJoinAsDoctor }) => {
     const handleDeleteSession = async (id: number) => {
         if (!confirm('¿Eliminar esta sesión?')) return;
         try {
-            await fetch(`/api/virtual-sessions/${id}`, { method: 'DELETE' });
+            await fetch(`/api/virtual-sessions/${id}`, { method: 'DELETE', headers: authHeaders() });
             fetchSessions();
         } catch (e) { console.error(e); }
     };
