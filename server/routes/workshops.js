@@ -4,6 +4,40 @@ import { authenticateToken } from '../middleware/auth.js';
 import logger from '../lib/logger.js';
 
 const router = Router();
+
+// ============================================================
+// PÚBLICO (sin autenticación) — para mostrar talleres en la landing.
+// Debe ir ANTES de router.use(authenticateToken).
+// ============================================================
+// GET /api/workshops/public — talleres "Abierto" con datos seguros (sin pacientes)
+router.get('/public', async (req, res, next) => {
+    try {
+        const workshops = await prisma.workshop.findMany({
+            where: { estado: 'Abierto' },
+            include: { _count: { select: { enrollments: true } } },
+            orderBy: { fechaInicio: 'asc' }
+        });
+        const data = workshops.map(w => ({
+            id: w.id,
+            titulo: w.titulo,
+            descripcion: w.descripcion,
+            fechaInicio: w.fechaInicio,
+            fechaFin: w.fechaFin,
+            horario: w.horario,
+            ubicacion: w.ubicacion,
+            precio: w.precio,
+            cupoMaximo: w.cupoMaximo,
+            inscritos: w._count.enrollments,
+            disponibles: Math.max(0, w.cupoMaximo - w._count.enrollments)
+        }));
+        res.json(data);
+    } catch (err) {
+        logger.error('GET /api/workshops/public', err);
+        next(err);
+    }
+});
+
+// A partir de aquí, todo requiere autenticación
 router.use(authenticateToken);
 
 // GET /api/workshops

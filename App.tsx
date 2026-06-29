@@ -8,6 +8,7 @@ import { VirtualWaitingRoom } from './components/VirtualWaitingRoom';
 import { JitsiMeetComponent } from './components/JitsiMeetComponent';
 import { PatientPortal } from './components/PatientPortal';
 import { AgentChat } from './components/AgentChat';
+import { WorkshopsSection } from './components/WorkshopsSection';
 import { useAuth } from './hooks/useAuth';
 import { SERVICES_LIST, CONTACT_INFO } from './constants';
 import { ViewState } from './types';
@@ -79,6 +80,7 @@ function App() {
             <a href="#inicio" className="text-slate-600 hover:text-brand-600 font-medium transition-colors">Inicio</a>
             <a href="#sobre-mi" className="text-slate-600 hover:text-brand-600 font-medium transition-colors">Sobre Mí</a>
             <a href="#servicios" className="text-slate-600 hover:text-brand-600 font-medium transition-colors">Servicios</a>
+            <a href="#talleres" className="text-slate-600 hover:text-brand-600 font-medium transition-colors">Talleres</a>
             <button
               onClick={() => setCurrentView('virtual-room')}
               className="text-brand-600 hover:text-brand-800 font-medium transition-colors flex items-center gap-1"
@@ -136,6 +138,13 @@ function App() {
               className="block px-3 py-2 text-slate-700 font-medium"
             >
               Servicios
+            </a>
+            <a
+              href="#talleres"
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="block px-3 py-2 text-slate-700 font-medium"
+            >
+              Talleres
             </a>
 
             <button
@@ -538,6 +547,7 @@ function App() {
           <Navbar />
           <Hero />
           <Services />
+          <WorkshopsSection />
           <About />
           <Footer />
           <ChatWidget onOpenBooking={handleBookingClick} />
