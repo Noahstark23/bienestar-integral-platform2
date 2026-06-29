@@ -106,9 +106,24 @@ async function startServer() {
 
     if (isProd) {
         const distPath = path.join(__dirname, '..', 'dist');
-        app.use(express.static(distPath));
+        // Cache-Control:
+        //  - index.html NUNCA se cachea: tras cada despliegue debe revalidarse
+        //    para que el navegador/CDN no sirva una versión vieja que apunta a
+        //    bundles con hash que ya no existen (causa de "pantalla en blanco").
+        //  - Los assets con hash (/assets/*) son inmutables: se cachean para siempre.
+        app.use(express.static(distPath, {
+            etag: true,
+            setHeaders: (res, filePath) => {
+                if (filePath.endsWith('index.html')) {
+                    res.setHeader('Cache-Control', 'no-store, must-revalidate');
+                } else if (filePath.includes(`${path.sep}assets${path.sep}`)) {
+                    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+                }
+            }
+        }));
         app.get('*', (req, res, next) => {
             if (!req.path.startsWith('/api')) {
+                res.setHeader('Cache-Control', 'no-store, must-revalidate');
                 res.sendFile(path.join(distPath, 'index.html'));
             } else {
                 next();
