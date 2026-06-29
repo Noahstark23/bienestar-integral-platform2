@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 
 interface User {
     id: number;
@@ -13,34 +13,28 @@ interface AuthState {
     token: string | null;
 }
 
-export const useAuth = () => {
-    const [authState, setAuthState] = useState<AuthState>({
-        isAuthenticated: false,
-        user: null,
-        token: null
-    });
-
-    // Check for existing token on mount
-    useEffect(() => {
-        const token = localStorage.getItem('auth_token');
-        const userStr = localStorage.getItem('auth_user');
-
-        if (token && userStr) {
-            try {
-                const user = JSON.parse(userStr);
-                setAuthState({
-                    isAuthenticated: true,
-                    user,
-                    token
-                });
-            } catch (err) {
-                console.error('Error parsing user data:', err);
-                // Clear invalid data
-                localStorage.removeItem('auth_token');
-                localStorage.removeItem('auth_user');
-            }
+// Lee la sesión guardada de forma síncrona para que el primer render ya sepa
+// si el usuario está autenticado (evita el parpadeo de login al recargar).
+const readStoredAuth = (): AuthState => {
+    if (typeof window === 'undefined') {
+        return { isAuthenticated: false, user: null, token: null };
+    }
+    const token = localStorage.getItem('auth_token');
+    const userStr = localStorage.getItem('auth_user');
+    if (token && userStr) {
+        try {
+            return { isAuthenticated: true, user: JSON.parse(userStr), token };
+        } catch (err) {
+            console.error('Error parsing user data:', err);
+            localStorage.removeItem('auth_token');
+            localStorage.removeItem('auth_user');
         }
-    }, []);
+    }
+    return { isAuthenticated: false, user: null, token: null };
+};
+
+export const useAuth = () => {
+    const [authState, setAuthState] = useState<AuthState>(readStoredAuth);
 
     const login = (token: string, user: User) => {
         localStorage.setItem('auth_token', token);

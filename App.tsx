@@ -14,7 +14,16 @@ import { ViewState } from './types';
 
 function App() {
   const { isAuthenticated, user, token, login, logout } = useAuth();
-  const [currentView, setCurrentView] = useState<ViewState>('landing');
+  // Persistimos la vista para que una recarga no devuelva al admin a la página
+  // pública (la sesión sobrevive en localStorage, la vista también debe).
+  const [currentView, setCurrentViewState] = useState<ViewState>(() => {
+    if (typeof window === 'undefined') return 'landing';
+    return (localStorage.getItem('current_view') as ViewState) || 'landing';
+  });
+  const setCurrentView = (view: ViewState) => {
+    setCurrentViewState(view);
+    try { localStorage.setItem('current_view', view); } catch { /* ignore */ }
+  };
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // --- Share Modal State ---

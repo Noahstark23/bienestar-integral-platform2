@@ -24,7 +24,10 @@ export default defineConfig(({ mode }) => {
     server: {
       proxy: {
         '/api': {
-          target: 'http://localhost:3001',
+          // El servidor Express corre en el puerto 3000 (server/index.js,
+          // .env.example, Docker). Antes apuntaba a 3001 y rompía el login en
+          // el flujo `npm run dev` (todas las llamadas /api fallaban).
+          target: 'http://localhost:3000',
           changeOrigin: true,
         }
       }
