@@ -64,13 +64,27 @@ app.set('trust proxy', 1);
 const allowedOrigin = process.env.ALLOWED_ORIGIN || 'http://localhost:5173';
 app.use(cors({ origin: allowedOrigin, credentials: true }));
 app.use(helmet({ contentSecurityPolicy: false }));
-app.use(express.json());
+// Límite de 12mb: los adjuntos del expediente (PatientFile) viajan en base64
+app.use(express.json({ limit: '12mb' }));
 app.use(express.urlencoded({ extended: true }));
 
 // Logging de requests
 app.use((req, res, next) => {
     logger.info(`${req.method} ${req.path}`);
     next();
+});
+
+// Health-check (ANTES del rate limiter: Docker/Coolify lo consultan cada pocos
+// segundos y no debe consumir cuota ni fallar por límite de peticiones).
+// Docker HEALTHCHECK lo usa para detectar proceso colgado y auto-reiniciar.
+app.get('/api/health', async (req, res) => {
+    try {
+        await prisma.$queryRaw`SELECT 1`;
+        res.json({ status: 'ok', db: 'ok', uptime: Math.round(process.uptime()) });
+    } catch (err) {
+        logger.error('Health-check: fallo de base de datos', err);
+        res.status(503).json({ status: 'error', db: 'down' });
+    }
 });
 
 // Rate limiting global (100 req/min por IP)

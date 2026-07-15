@@ -169,6 +169,38 @@ router.post('/2fa/enable', authenticateToken, async (req, res, next) => {
     }
 });
 
+// POST /api/auth/change-password — cambia la contraseña del usuario autenticado
+router.post('/change-password', authenticateToken, async (req, res, next) => {
+    try {
+        const { currentPassword, newPassword } = req.body;
+
+        if (!currentPassword || !newPassword) {
+            return res.status(400).json({ error: 'Contraseña actual y nueva requeridas' });
+        }
+        if (String(newPassword).length < 8) {
+            return res.status(400).json({ error: 'La nueva contraseña debe tener al menos 8 caracteres' });
+        }
+        if (currentPassword === newPassword) {
+            return res.status(400).json({ error: 'La nueva contraseña debe ser diferente a la actual' });
+        }
+
+        const user = await prisma.user.findUnique({ where: { id: req.user.id } });
+        if (!user) return res.status(404).json({ error: 'Usuario no encontrado' });
+
+        const match = await bcrypt.compare(currentPassword, user.passwordHash);
+        if (!match) return res.status(401).json({ error: 'La contraseña actual es incorrecta' });
+
+        const passwordHash = await bcrypt.hash(newPassword, 12);
+        await prisma.user.update({ where: { id: user.id }, data: { passwordHash } });
+
+        logger.info(`Contraseña cambiada para el usuario ${user.username}`);
+        res.json({ success: true, message: 'Contraseña actualizada correctamente' });
+    } catch (err) {
+        logger.error('POST /api/auth/change-password', err);
+        next(err);
+    }
+});
+
 // POST /api/auth/2fa/disable — desactiva 2FA (requiere código válido)
 router.post('/2fa/disable', authenticateToken, async (req, res, next) => {
     try {

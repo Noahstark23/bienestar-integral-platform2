@@ -62,6 +62,13 @@ router.get('/:id', async (req, res, next) => {
     }
 });
 
+// Campos de texto ampliados del expediente (auto-relleno de documentos)
+const CAMPOS_AMPLIADOS = [
+    'email', 'sexo', 'direccion', 'barrio', 'lugarNacimiento', 'remision',
+    'situacionLaboral', 'numHijos', 'apodo', 'nombreMadre', 'telefonoMadre',
+    'nombrePadre', 'telefonoPadre', 'tutorIdentificacion'
+];
+
 // POST /api/patients
 router.post('/', async (req, res, next) => {
     try {
@@ -75,6 +82,11 @@ router.post('/', async (req, res, next) => {
             return res.status(400).json({ error: 'Faltan campos requeridos: nombre, edad, telefono, motivo' });
         }
 
+        const ampliados = {};
+        for (const c of CAMPOS_AMPLIADOS) {
+            if (typeof req.body[c] === 'string') ampliados[c] = req.body[c];
+        }
+
         const newPatient = await prisma.patient.create({
             data: {
                 nombre,
@@ -86,7 +98,8 @@ router.post('/', async (req, res, next) => {
                 escolaridad: escolaridad || '',
                 estadoCivil: estadoCivil || '',
                 tutorNombre: tutorNombre || null,
-                tutorRelacion: tutorRelacion || null
+                tutorRelacion: tutorRelacion || null,
+                ...ampliados
             }
         });
 
@@ -101,7 +114,17 @@ router.post('/', async (req, res, next) => {
 // PUT /api/patients/:id
 router.put('/:id', async (req, res, next) => {
     try {
-        const updateData = req.body;
+        // Lista blanca contra mass-assignment: solo columnas editables del paciente
+        const EDITABLES = [
+            'nombre', 'edad', 'telefono', 'motivo', 'fechaNacimiento',
+            'ocupacion', 'escolaridad', 'estadoCivil', 'tutorNombre', 'tutorRelacion',
+            'estado', 'fechaAlta', 'motivoAlta', 'faseProceso',
+            ...CAMPOS_AMPLIADOS
+        ];
+        const updateData = {};
+        for (const c of EDITABLES) {
+            if (req.body[c] !== undefined) updateData[c] = req.body[c];
+        }
 
         if (updateData.fechaNacimiento) updateData.fechaNacimiento = new Date(updateData.fechaNacimiento);
         if (updateData.fechaAlta) updateData.fechaAlta = new Date(updateData.fechaAlta);
@@ -116,6 +139,94 @@ router.put('/:id', async (req, res, next) => {
         res.json(updatedPatient);
     } catch (err) {
         logger.error('PUT /api/patients/:id', err);
+        next(err);
+    }
+});
+
+// ============================================
+// ADJUNTOS DEL EXPEDIENTE (PatientFile)
+// Contrato firmado escaneado, plan de intervención externo, informes, etc.
+// ============================================
+const MAX_FILE_BYTES = 8 * 1024 * 1024; // 8 MB
+
+// GET /api/patients/:id/files — lista (sin el contenido binario)
+router.get('/:id/files', async (req, res, next) => {
+    try {
+        const files = await prisma.patientFile.findMany({
+            where: { patientId: parseInt(req.params.id) },
+            select: { id: true, categoria: true, nombre: true, mimeType: true, size: true, creadoEn: true },
+            orderBy: { creadoEn: 'desc' }
+        });
+        res.json(files);
+    } catch (err) {
+        logger.error('GET /api/patients/:id/files', err);
+        next(err);
+    }
+});
+
+// POST /api/patients/:id/files — subir archivo { nombre, categoria, mimeType, dataBase64 }
+router.post('/:id/files', async (req, res, next) => {
+    try {
+        const patientId = parseInt(req.params.id);
+        const { nombre, categoria, mimeType, dataBase64 } = req.body;
+
+        if (!nombre || !dataBase64) {
+            return res.status(400).json({ error: 'nombre y dataBase64 son requeridos' });
+        }
+        const buffer = Buffer.from(dataBase64, 'base64');
+        if (buffer.length === 0) return res.status(400).json({ error: 'Archivo vacío o base64 inválido' });
+        if (buffer.length > MAX_FILE_BYTES) {
+            return res.status(413).json({ error: 'El archivo supera el límite de 8 MB' });
+        }
+
+        const file = await prisma.patientFile.create({
+            data: {
+                patientId,
+                nombre: String(nombre).slice(0, 200),
+                categoria: categoria || 'General',
+                mimeType: mimeType || 'application/octet-stream',
+                size: buffer.length,
+                data: buffer
+            },
+            select: { id: true, categoria: true, nombre: true, mimeType: true, size: true, creadoEn: true }
+        });
+
+        logAction(req, 'UPLOAD_PATIENT_FILE', 'Patient', patientId, `Archivo: ${file.nombre} (${file.categoria})`);
+        res.status(201).json(file);
+    } catch (err) {
+        logger.error('POST /api/patients/:id/files', err);
+        next(err);
+    }
+});
+
+// GET /api/patients/:id/files/:fileId/download — descarga el binario
+router.get('/:id/files/:fileId/download', async (req, res, next) => {
+    try {
+        const file = await prisma.patientFile.findFirst({
+            where: { id: parseInt(req.params.fileId), patientId: parseInt(req.params.id) }
+        });
+        if (!file) return res.status(404).json({ error: 'Archivo no encontrado' });
+
+        res.setHeader('Content-Type', file.mimeType);
+        res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(file.nombre)}"`);
+        res.send(Buffer.from(file.data));
+    } catch (err) {
+        logger.error('GET /api/patients/:id/files/:fileId/download', err);
+        next(err);
+    }
+});
+
+// DELETE /api/patients/:id/files/:fileId
+router.delete('/:id/files/:fileId', async (req, res, next) => {
+    try {
+        const fileId = parseInt(req.params.fileId);
+        await prisma.patientFile.deleteMany({
+            where: { id: fileId, patientId: parseInt(req.params.id) }
+        });
+        logAction(req, 'DELETE_PATIENT_FILE', 'Patient', parseInt(req.params.id), `Archivo #${fileId}`);
+        res.json({ success: true });
+    } catch (err) {
+        logger.error('DELETE /api/patients/:id/files/:fileId', err);
         next(err);
     }
 });

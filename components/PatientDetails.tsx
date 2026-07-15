@@ -1,5 +1,5 @@
 ﻿import React, { useState, useEffect } from 'react';
-import { X, User, FileText, Clock, Save, Edit2, CheckCircle, Target, Plus, AlertTriangle, XCircle, Pencil, Package, BarChart2, ClipboardList, Download, FileSignature, Loader2 } from 'lucide-react';
+import { X, User, FileText, Clock, Save, Edit2, CheckCircle, Target, Plus, AlertTriangle, XCircle, Pencil, Package, BarChart2, ClipboardList, Download, FileSignature, Loader2, Paperclip, Upload, Trash2 } from 'lucide-react';
 import { Patient, ClinicalRecord, Session, ClinicalDocument } from '../types';
 import { AssessmentPanel } from './AssessmentPanel';
 
@@ -8,7 +8,7 @@ interface PatientDetailsProps {
     onClose: () => void;
 }
 
-type TabType = 'general' | 'clinical' | 'plan' | 'timeline' | 'goals' | 'documentos' | 'packages' | 'escalas';
+type TabType = 'general' | 'clinical' | 'plan' | 'timeline' | 'goals' | 'documentos' | 'archivos' | 'packages' | 'escalas';
 
 const FASES_PROCESO = ['EvaluacionInicial', 'Procesamiento', 'Perfil', 'Plan', 'Devolucion', 'Intervencion', 'Seguimiento', 'Alta'];
 const FASE_LABEL: Record<string, string> = {
@@ -75,13 +75,22 @@ export const PatientDetails: React.FC<PatientDetailsProps> = ({ patientId, onClo
     const [docLoading, setDocLoading] = useState<string | null>(null);
     const [previewDoc, setPreviewDoc] = useState<ClinicalDocument | null>(null);
 
-    // General info editing
+    // General info editing (incluye los datos ampliados que alimentan los documentos)
     const [editingGeneral, setEditingGeneral] = useState(false);
     const [generalData, setGeneralData] = useState({
         nombre: '', edad: '', telefono: '', motivo: '',
-        ocupacion: '', escolaridad: '', estadoCivil: '',
-        tutorNombre: '', tutorRelacion: ''
+        ocupacion: '', escolaridad: '', estadoCivil: '', fechaNacimiento: '',
+        tutorNombre: '', tutorRelacion: '', tutorIdentificacion: '',
+        sexo: '', direccion: '', barrio: '', lugarNacimiento: '',
+        remision: '', situacionLaboral: '', numHijos: '', apodo: '',
+        nombreMadre: '', telefonoMadre: '', nombrePadre: '', telefonoPadre: '',
+        email: ''
     });
+
+    // Adjuntos del expediente (contrato firmado, plan externo, informes...)
+    const [patientFiles, setPatientFiles] = useState<any[]>([]);
+    const [uploadCategoria, setUploadCategoria] = useState('Contrato firmado');
+    const [uploading, setUploading] = useState(false);
 
     // Discharge
     const [showDischargeConfirm, setShowDischargeConfirm] = useState(false);
@@ -114,6 +123,7 @@ export const PatientDetails: React.FC<PatientDetailsProps> = ({ patientId, onClo
     useEffect(() => {
         if (activeTab === 'goals') loadGoals();
         if (activeTab === 'packages') loadPackages();
+        if (activeTab === 'archivos') loadFiles();
     }, [activeTab]);
 
     const loadPatientData = async () => {
@@ -138,8 +148,23 @@ export const PatientDetails: React.FC<PatientDetailsProps> = ({ patientId, onClo
                 ocupacion: data.ocupacion || '',
                 escolaridad: data.escolaridad || '',
                 estadoCivil: data.estadoCivil || '',
+                fechaNacimiento: data.fechaNacimiento ? String(data.fechaNacimiento).slice(0, 10) : '',
                 tutorNombre: data.tutorNombre || '',
-                tutorRelacion: data.tutorRelacion || ''
+                tutorRelacion: data.tutorRelacion || '',
+                tutorIdentificacion: data.tutorIdentificacion || '',
+                sexo: data.sexo || '',
+                direccion: data.direccion || '',
+                barrio: data.barrio || '',
+                lugarNacimiento: data.lugarNacimiento || '',
+                remision: data.remision || '',
+                situacionLaboral: data.situacionLaboral || '',
+                numHijos: data.numHijos || '',
+                apodo: data.apodo || '',
+                nombreMadre: data.nombreMadre || '',
+                telefonoMadre: data.telefonoMadre || '',
+                nombrePadre: data.nombrePadre || '',
+                telefonoPadre: data.telefonoPadre || '',
+                email: data.email || ''
             });
         } catch (err) {
             setError('Error cargando datos del paciente.');
@@ -340,13 +365,16 @@ export const PatientDetails: React.FC<PatientDetailsProps> = ({ patientId, onClo
     const handleSaveGeneral = async () => {
         try {
             setSaving(true);
+            const payload: any = {
+                ...generalData,
+                edad: parseInt(generalData.edad) || patient?.edad
+            };
+            // Una fecha vacía no debe enviarse (el backend espera DateTime o nada)
+            if (!payload.fechaNacimiento) delete payload.fechaNacimiento;
             const res = await fetch(`/api/patients/${patientId}`, {
                 method: 'PUT',
                 headers: getAuthHeaders(),
-                body: JSON.stringify({
-                    ...generalData,
-                    edad: parseInt(generalData.edad) || patient?.edad
-                })
+                body: JSON.stringify(payload)
             });
             if (!res.ok) throw new Error('Failed to update');
             await loadPatientData();
@@ -355,6 +383,85 @@ export const PatientDetails: React.FC<PatientDetailsProps> = ({ patientId, onClo
             setError('Error guardando datos del paciente.');
         } finally {
             setSaving(false);
+        }
+    };
+
+    // ── Adjuntos del expediente ──────────────────────────────────
+    const loadFiles = async () => {
+        try {
+            const res = await fetch(`/api/patients/${patientId}/files`, { headers: getAuthHeaders() });
+            const data = await res.json();
+            setPatientFiles(Array.isArray(data) ? data : []);
+        } catch (err) {
+            console.error('Error loading files:', err);
+        }
+    };
+
+    const handleUploadFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        e.target.value = ''; // permite volver a elegir el mismo archivo
+        if (!file) return;
+        if (file.size > 8 * 1024 * 1024) {
+            setError('El archivo supera el límite de 8 MB.');
+            return;
+        }
+        setUploading(true);
+        try {
+            // Archivo → base64 (sin el prefijo data:...;base64,)
+            const dataBase64: string = await new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(String(reader.result).split(',')[1] || '');
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+            const res = await fetch(`/api/patients/${patientId}/files`, {
+                method: 'POST',
+                headers: getAuthHeaders(),
+                body: JSON.stringify({
+                    nombre: file.name,
+                    categoria: uploadCategoria,
+                    mimeType: file.type || 'application/octet-stream',
+                    dataBase64
+                })
+            });
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err.error || 'Error al subir el archivo');
+            }
+            await loadFiles();
+        } catch (err: any) {
+            setError(err?.message || 'Error al subir el archivo.');
+        } finally {
+            setUploading(false);
+        }
+    };
+
+    const handleDownloadFile = async (fileId: number, nombre: string) => {
+        try {
+            const res = await fetch(`/api/patients/${patientId}/files/${fileId}/download`, { headers: getAuthHeaders() });
+            if (!res.ok) throw new Error('download');
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = nombre;
+            a.click();
+            URL.revokeObjectURL(url);
+        } catch {
+            setError('No se pudo descargar el archivo.');
+        }
+    };
+
+    const handleDeleteFile = async (fileId: number) => {
+        if (!confirm('¿Eliminar este archivo del expediente?')) return;
+        try {
+            const res = await fetch(`/api/patients/${patientId}/files/${fileId}`, {
+                method: 'DELETE',
+                headers: getAuthHeaders()
+            });
+            if (res.ok) loadFiles();
+        } catch {
+            setError('No se pudo eliminar el archivo.');
         }
     };
 
@@ -419,6 +526,7 @@ export const PatientDetails: React.FC<PatientDetailsProps> = ({ patientId, onClo
         { id: 'timeline', label: 'Historial', icon: <Clock size={16} /> },
         { id: 'goals', label: 'Objetivos', icon: <Target size={16} /> },
         { id: 'documentos', label: 'Documentos', icon: <FileSignature size={16} /> },
+        { id: 'archivos', label: 'Archivos', icon: <Paperclip size={16} /> },
         { id: 'packages', label: 'Paquetes', icon: <Package size={16} /> },
         { id: 'escalas', label: 'Escalas', icon: <BarChart2 size={16} /> }
     ] as const;
@@ -553,12 +661,27 @@ export const PatientDetails: React.FC<PatientDetailsProps> = ({ patientId, onClo
                                     {[
                                         { label: 'Nombre completo', key: 'nombre', type: 'text' },
                                         { label: 'Edad', key: 'edad', type: 'number' },
+                                        { label: 'Fecha de Nacimiento', key: 'fechaNacimiento', type: 'date' },
+                                        { label: 'Sexo / Género', key: 'sexo', type: 'text' },
                                         { label: 'Teléfono', key: 'telefono', type: 'tel' },
+                                        { label: 'Correo electrónico', key: 'email', type: 'email' },
                                         { label: 'Ocupación', key: 'ocupacion', type: 'text' },
                                         { label: 'Escolaridad', key: 'escolaridad', type: 'text' },
                                         { label: 'Estado Civil', key: 'estadoCivil', type: 'text' },
+                                        { label: 'Situación laboral', key: 'situacionLaboral', type: 'text' },
+                                        { label: 'Dirección', key: 'direccion', type: 'text' },
+                                        { label: 'Barrio', key: 'barrio', type: 'text' },
+                                        { label: 'Lugar de nacimiento', key: 'lugarNacimiento', type: 'text' },
+                                        { label: 'Remisión / Referente', key: 'remision', type: 'text' },
+                                        { label: 'N° de hijas/os', key: 'numHijos', type: 'text' },
+                                        { label: 'Cómo le llaman en casa', key: 'apodo', type: 'text' },
+                                        { label: 'Nombre de la madre', key: 'nombreMadre', type: 'text' },
+                                        { label: 'Teléfono de la madre', key: 'telefonoMadre', type: 'tel' },
+                                        { label: 'Nombre del padre', key: 'nombrePadre', type: 'text' },
+                                        { label: 'Teléfono del padre', key: 'telefonoPadre', type: 'tel' },
                                         { label: 'Nombre del Tutor/Guardián', key: 'tutorNombre', type: 'text' },
-                                        { label: 'Parentesco del Tutor', key: 'tutorRelacion', type: 'text' }
+                                        { label: 'Parentesco del Tutor', key: 'tutorRelacion', type: 'text' },
+                                        { label: 'Identificación del Tutor', key: 'tutorIdentificacion', type: 'text' }
                                     ].map(field => (
                                         <div key={field.key}>
                                             <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">{field.label}</label>
@@ -585,11 +708,22 @@ export const PatientDetails: React.FC<PatientDetailsProps> = ({ patientId, onClo
                                     <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                                         {[
                                             { label: 'Edad', value: `${patient.edad} años` },
+                                            { label: 'Sexo', value: patient.sexo || '—' },
                                             { label: 'Teléfono', value: patient.telefono },
+                                            { label: 'Correo', value: patient.email || '—' },
                                             { label: 'Ocupación', value: patient.ocupacion || '—' },
                                             { label: 'Escolaridad', value: patient.escolaridad || '—' },
                                             { label: 'Estado Civil', value: patient.estadoCivil || '—' },
+                                            { label: 'Situación laboral', value: patient.situacionLaboral || '—' },
                                             { label: 'Fecha Nacimiento', value: patient.fechaNacimiento ? new Date(patient.fechaNacimiento).toLocaleDateString('es-NI') : '—' },
+                                            { label: 'Lugar de nacimiento', value: patient.lugarNacimiento || '—' },
+                                            { label: 'Dirección', value: patient.direccion || '—' },
+                                            { label: 'Barrio', value: patient.barrio || '—' },
+                                            { label: 'Remisión', value: patient.remision || '—' },
+                                            { label: 'N° de hijas/os', value: patient.numHijos || '—' },
+                                            { label: 'Cómo le llaman', value: patient.apodo || '—' },
+                                            { label: 'Madre', value: patient.nombreMadre ? `${patient.nombreMadre}${patient.telefonoMadre ? ' · ' + patient.telefonoMadre : ''}` : '—' },
+                                            { label: 'Padre', value: patient.nombrePadre ? `${patient.nombrePadre}${patient.telefonoPadre ? ' · ' + patient.telefonoPadre : ''}` : '—' },
                                         ].map(item => (
                                             <div key={item.label} className="bg-slate-50 p-4 rounded-lg">
                                                 <p className="text-xs font-semibold text-slate-500 uppercase">{item.label}</p>
@@ -1035,6 +1169,90 @@ export const PatientDetails: React.FC<PatientDetailsProps> = ({ patientId, onClo
                                     </div>
                                 ))}
                             </div>
+                        </div>
+                    )}
+
+                    {/* ── ARCHIVOS TAB (adjuntos: contrato firmado, plan externo...) ── */}
+                    {activeTab === 'archivos' && (
+                        <div className="space-y-4">
+                            <div>
+                                <h3 className="text-lg font-bold text-slate-800">Archivos del expediente</h3>
+                                <p className="text-sm text-slate-500 mt-1">
+                                    Sube documentos escaneados o externos: el <strong>contrato firmado y sellado</strong>, un <strong>plan de intervención elaborado fuera del sistema</strong>, informes, remisiones, etc. (máx. 8 MB por archivo).
+                                </p>
+                            </div>
+
+                            {/* Subir */}
+                            <div className="bg-brand-50 border border-brand-100 rounded-xl p-4 flex flex-col md:flex-row md:items-center gap-3">
+                                <div className="flex-1">
+                                    <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">Categoría</label>
+                                    <select
+                                        value={uploadCategoria}
+                                        onChange={e => setUploadCategoria(e.target.value)}
+                                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-500"
+                                    >
+                                        <option>Contrato firmado</option>
+                                        <option>Consentimiento firmado</option>
+                                        <option>Plan de intervención</option>
+                                        <option>Informe</option>
+                                        <option>Resultados de pruebas</option>
+                                        <option>Otro</option>
+                                    </select>
+                                </div>
+                                <label className={`inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium cursor-pointer transition-colors mt-2 md:mt-5 ${uploading ? 'bg-slate-200 text-slate-500 cursor-wait' : 'bg-brand-600 text-white hover:bg-brand-700'}`}>
+                                    {uploading ? <Loader2 size={15} className="animate-spin" /> : <Upload size={15} />}
+                                    {uploading ? 'Subiendo...' : 'Subir archivo'}
+                                    <input
+                                        type="file"
+                                        className="hidden"
+                                        accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.webp"
+                                        onChange={handleUploadFile}
+                                        disabled={uploading}
+                                    />
+                                </label>
+                            </div>
+
+                            {/* Lista */}
+                            {patientFiles.length === 0 ? (
+                                <div className="text-center py-10 text-slate-400">
+                                    <Paperclip size={40} className="mx-auto mb-3 opacity-40" />
+                                    <p>Sin archivos adjuntos.</p>
+                                </div>
+                            ) : (
+                                <div className="space-y-2">
+                                    {patientFiles.map(f => (
+                                        <div key={f.id} className="border border-slate-200 rounded-xl p-3 flex items-center justify-between gap-3 hover:shadow-sm transition-shadow">
+                                            <div className="flex items-center gap-3 min-w-0">
+                                                <div className="w-9 h-9 bg-brand-50 rounded-lg flex items-center justify-center shrink-0">
+                                                    <Paperclip size={16} className="text-brand-600" />
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <p className="text-sm font-medium text-slate-800 truncate">{f.nombre}</p>
+                                                    <p className="text-xs text-slate-400">
+                                                        {f.categoria} · {(f.size / 1024).toFixed(0)} KB · {new Date(f.creadoEn).toLocaleDateString('es-NI')}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-1.5 shrink-0">
+                                                <button
+                                                    onClick={() => handleDownloadFile(f.id, f.nombre)}
+                                                    className="p-2 text-brand-600 hover:bg-brand-50 rounded-lg transition-colors"
+                                                    title="Descargar"
+                                                >
+                                                    <Download size={15} />
+                                                </button>
+                                                <button
+                                                    onClick={() => handleDeleteFile(f.id)}
+                                                    className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                                    title="Eliminar"
+                                                >
+                                                    <Trash2 size={15} />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     )}
 

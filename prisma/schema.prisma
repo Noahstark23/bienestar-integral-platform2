@@ -37,12 +37,26 @@ model Patient {
   escolaridad       String    @default("")
   estadoCivil       String    @default("")
   
-  // Guardian Info (for minors)
   email             String    @default("")
+
+  // Datos ampliados del expediente — auto-relleno de instrumentos/documentos
+  sexo                String  @default("")   // "Femenino" | "Masculino" | otro
+  direccion           String  @default("")
+  barrio              String  @default("")
+  lugarNacimiento     String  @default("")
+  remision            String  @default("")   // quién refiere / referente
+  situacionLaboral    String  @default("")
+  numHijos            String  @default("")   // N° de hijas/os
+  apodo               String  @default("")   // cómo le llaman en casa
+  nombreMadre         String  @default("")
+  telefonoMadre       String  @default("")
+  nombrePadre         String  @default("")
+  telefonoPadre       String  @default("")
 
   // Guardian Info (for minors)
   tutorNombre       String?
   tutorRelacion     String?   // "Madre", "Padre", "Tutor Legal", etc.
+  tutorIdentificacion String  @default("")   // cédula del representante legal
   
   // Status & Discharge
   estado            String    @default("Activo")  // "Activo", "En Pausa", "Alta"
@@ -66,6 +80,26 @@ model Patient {
   virtualSessions   VirtualSession[]     // Teleconsultas
   sessionPackages   SessionPackage[]     // Paquetes de sesiones
   assessments       Assessment[]         // Escalas psicológicas
+  files             PatientFile[]        // Adjuntos (contratos firmados, planes externos, etc.)
+}
+
+// ============================================
+// PATIENT FILE - Adjuntos del expediente
+// (contrato firmado escaneado, plan de intervención externo, informes, etc.)
+// ============================================
+model PatientFile {
+  id         Int      @id @default(autoincrement())
+  patientId  Int
+  patient    Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  categoria  String   @default("General") // "Contrato firmado" | "Plan de intervención" | "Informe" | "Otro"
+  nombre     String                        // nombre del archivo
+  mimeType   String   @default("application/octet-stream")
+  size       Int      @default(0)          // bytes
+  data       Bytes                         // contenido (límite validado en la ruta)
+  creadoEn   DateTime @default(now())
+
+  @@index([patientId])
 }
 
 // ============================================
@@ -315,10 +349,14 @@ model WorkshopEnrollment {
   id          Int       @id @default(autoincrement())
   workshopId  Int
   workshop    Workshop  @relation(fields: [workshopId], references: [id], onDelete: Cascade)
-  
-  patientId   Int
-  patient     Patient   @relation(fields: [patientId], references: [id], onDelete: Cascade)
-  
+
+  // Paciente registrado (opcional) O participante externo (nombre/teléfono).
+  // Mismo patrón que VirtualSession: patientId nullable + datos libres.
+  patientId   Int?
+  patient     Patient?  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  nombreExterno   String @default("")
+  telefonoExterno String @default("")
+
   fechaInscripcion DateTime @default(now())
   pagado      Boolean   @default(false)
   

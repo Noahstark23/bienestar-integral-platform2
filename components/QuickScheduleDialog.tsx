@@ -35,7 +35,8 @@ export const QuickScheduleDialog: React.FC<QuickScheduleDialogProps> = ({ date, 
     useEffect(() => {
         const fetchPatients = async () => {
             try {
-                const res = await fetch('/api/patients', { headers: getAuthHeaders() });
+                // limit=100 para que el selector no quede truncado a los primeros 20
+                const res = await fetch('/api/patients?limit=100', { headers: getAuthHeaders() });
                 const data = await res.json();
                 setPatients(Array.isArray(data?.data) ? data.data : Array.isArray(data) ? data : []);
             } catch (error) {
