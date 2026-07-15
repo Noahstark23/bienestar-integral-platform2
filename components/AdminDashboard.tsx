@@ -20,6 +20,8 @@ import { RegisterPaymentModal } from './RegisterPaymentModal';
 import { WorkshopManager } from './WorkshopManager';
 import { VirtualSessionManager } from './VirtualSessionManager';
 import { TelmedAvailabilityManager } from './TelmedAvailabilityManager';
+import { BackupPanel } from './BackupPanel';
+import { WhatsAppReminders } from './WhatsAppReminders';
 
 // ── AuditLogPanel ──────────────────────────────────────────────────────────
 const AuditLogPanel: React.FC<{ getAuthHeaders: () => Record<string, string> }> = ({ getAuthHeaders }) => {
@@ -706,6 +708,9 @@ export const AdminDashboard: React.FC = () => {
         {/* Dashboard View */}
         {activeTab === 'dashboard' && (
           <div className="space-y-6">
+            {/* Recordatorios WhatsApp — citas de hoy y mañana */}
+            <WhatsAppReminders getAuthHeaders={getAuthHeaders} />
+
             {/* KPI Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
@@ -1105,6 +1110,7 @@ export const AdminDashboard: React.FC = () => {
         {/* Config - Availability Management + Audit */}
         {activeTab === 'config' && (
           <div className="space-y-8">
+            <BackupPanel getAuthHeaders={getAuthHeaders} />
             <ChangePasswordPanel getAuthHeaders={getAuthHeaders} />
             <TwoFactorPanel getAuthHeaders={getAuthHeaders} />
             <AvailabilityManager />

@@ -34,6 +34,8 @@ import remindersRouter from './routes/reminders.js';
 import knowledgeRouter from './routes/knowledge.js';
 import documentsRouter from './routes/documents.js';
 import { startReminderJob } from './jobs/reminders.js';
+import { startBackupJob } from './jobs/backup.js';
+import backupRouter from './routes/backup.js';
 import rag from './lib/rag.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -117,6 +119,7 @@ app.use('/api/agent', agentRouter);
 app.use('/api/reminders', remindersRouter);
 app.use('/api/knowledge', knowledgeRouter);
 app.use('/api/documents', documentsRouter);
+app.use('/api/backup', backupRouter);
 // Error handlers will be mounted at the end of startServer
 
 // ============================================
@@ -168,6 +171,7 @@ async function startServer() {
     app.listen(PORT, () => {
         logger.info(`Servidor corriendo en http://localhost:${PORT}`);
         startReminderJob();
+        startBackupJob(); // Respaldo diario de la base de datos por correo
         rag.warmup(); // Pre-calienta el índice RAG sin bloquear el arranque
     });
 }

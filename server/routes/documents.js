@@ -24,6 +24,8 @@ router.get('/patient/:id/:tipo', async (req, res, next) => {
             include: {
                 clinicalRecord: true,
                 therapeuticGoals: { orderBy: { fechaInicio: 'asc' } },
+                sessions: { orderBy: { fecha: 'asc' } },
+                assessments: { orderBy: { fecha: 'asc' } },
             },
         });
         if (!patient) return res.status(404).json({ error: 'Paciente no encontrado' });

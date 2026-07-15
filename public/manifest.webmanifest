@@ -1,0 +1,17 @@
+{
+  "name": "Bienestar Integral — Consultorio Psicológico",
+  "short_name": "Bienestar",
+  "description": "Sistema del Consultorio Psicológico Bienestar Integral — Lic. Esmirna García",
+  "lang": "es",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#0284c7",
+  "background_color": "#f0f9ff",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
