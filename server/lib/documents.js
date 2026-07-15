@@ -26,6 +26,7 @@ export const DOCUMENT_TYPES = [
     { tipo: 'historial-clinico', titulo: 'Historial Clínico (Anamnesis)' },
     { tipo: 'perfil-clinico', titulo: 'Perfil Clínico' },
     { tipo: 'plan-intervencion', titulo: 'Plan de Intervención' },
+    { tipo: 'expediente-completo', titulo: 'Expediente Clínico Completo' },
 ];
 
 const BLANK = '_______________________';
@@ -241,6 +242,73 @@ function planIntervencion(p) {
     };
 }
 
+// Expediente completo: todo el caso en un solo documento, para remisiones,
+// solicitudes legales o traslado del paciente a otro profesional.
+function expedienteCompleto(p) {
+    const cr = p?.clinicalRecord || {};
+    const goals = Array.isArray(p?.therapeuticGoals) ? p.therapeuticGoals : [];
+    const sessions = Array.isArray(p?.sessions) ? p.sessions : [];
+    const assessments = Array.isArray(p?.assessments) ? p.assessments : [];
+
+    const fechaCorta = (d) => d ? new Date(d).toLocaleDateString('es-NI', { day: '2-digit', month: '2-digit', year: 'numeric' }) : BLANK;
+
+    const secciones = [
+        { heading: '', lines: [
+            `${PROFESIONAL.consultorio}`,
+            `Profesional: ${PROFESIONAL.nombre} — Cód. MINSA: ${PROFESIONAL.codigoMinsa}`,
+            `Documento generado el ${fechaLarga()} — USO CONFIDENCIAL`,
+        ]},
+        { heading: 'I. Datos generales', lines: [
+            `Nombre: ${val(p?.nombre)}        Expediente #${val(p?.id)}`,
+            `Edad: ${val(p?.edad)}        Sexo: ${val(p?.sexo)}        Fecha de nacimiento: ${fechaCorta(p?.fechaNacimiento)}`,
+            `Teléfono: ${val(p?.telefono)}        Email: ${val(p?.email, '—')}`,
+            `Dirección: ${val(p?.direccion, '—')}        Barrio: ${val(p?.barrio, '—')}`,
+            `Ocupación: ${val(p?.ocupacion, '—')}        Escolaridad: ${val(p?.escolaridad, '—')}        Estado civil: ${val(p?.estadoCivil, '—')}`,
+            `Remisión/Referente: ${val(p?.remision, '—')}        Situación laboral: ${val(p?.situacionLaboral, '—')}`,
+            ...(p?.tutorNombre ? [`Tutor: ${p.tutorNombre} (${val(p?.tutorRelacion, '—')}) — ID: ${val(p?.tutorIdentificacion, '—')}`] : []),
+            `Estado: ${val(p?.estado)}        Fase del proceso: ${val(p?.faseProceso)}        Ingreso: ${fechaCorta(p?.createdAt)}`,
+        ]},
+        { heading: 'II. Motivo de consulta', lines: [val(p?.motivo, 'Sin información.')] },
+        { heading: 'III. Anamnesis', lines: [
+            `Antecedentes médicos: ${val(cr.antecedentesMedicos, 'Sin información.')}`,
+            `Antecedentes familiares: ${val(cr.antecedentesFamiliares, 'Sin información.')}`,
+            `Historia del desarrollo: ${val(cr.historiaDesarrollo, 'Sin información.')}`,
+        ]},
+        { heading: 'IV. Evaluación y diagnóstico', lines: [
+            `Análisis de pruebas: ${val(cr.analisisPruebas, 'Sin información.')}`,
+            `Perfil clínico: ${val(cr.perfilClinico, 'Sin información.')}`,
+            `Diagnóstico: ${val(cr.diagnostico, 'Sin información.')}`,
+        ]},
+        { heading: 'V. Plan de intervención', lines: [val(cr.planIntervencion, 'Sin información.')] },
+        { heading: `VI. Objetivos terapéuticos (${goals.length})`, lines: goals.length
+            ? goals.map((g, i) => `${i + 1}. ${g.titulo} [${g.estado || 'Pendiente'}${g.progreso ? `, ${g.progreso}%` : ''}]${g.descripcion ? ' — ' + g.descripcion : ''}`)
+            : ['Sin objetivos registrados.'] },
+        { heading: `VII. Escalas aplicadas (${assessments.length})`, lines: assessments.length
+            ? assessments.map(a => `${fechaCorta(a.fecha)} — ${a.tipo}: ${a.puntaje} pts (${a.interpretacion})`)
+            : ['Sin escalas aplicadas.'] },
+    ];
+
+    // Una sección por sesión, en orden cronológico
+    secciones.push({ heading: `VIII. Historial de sesiones (${sessions.length})`, lines: sessions.length ? [] : ['Sin sesiones registradas.'] });
+    sessions.forEach((s, i) => {
+        const lines = [];
+        if (s.notaSubjetiva) lines.push(`S (Subjetivo): ${s.notaSubjetiva}`);
+        if (s.notaObjetiva) lines.push(`O (Objetivo): ${s.notaObjetiva}`);
+        if (s.notaAnalisis) lines.push(`A (Análisis): ${s.notaAnalisis}`);
+        if (s.notaPlan) lines.push(`P (Plan): ${s.notaPlan}`);
+        if (s.resumen && !lines.length) lines.push(`Notas: ${s.resumen}`);
+        if (s.objetivoTrabajado) lines.push(`Objetivo trabajado: ${s.objetivoTrabajado}`);
+        if (s.tecnicas) lines.push(`Técnicas: ${s.tecnicas}`);
+        if (!lines.length) lines.push('Sin notas registradas.');
+        secciones.push({
+            heading: `Sesión ${i + 1} — ${fechaCorta(s.fecha)} (${s.tipo || 'Terapia'}${s.categoria === 'Seguimiento' ? ' · Seguimiento' : ''})`,
+            lines,
+        });
+    });
+
+    return { secciones };
+}
+
 const GENERATORS = {
     'contrato-adultos': contratoAdultos,
     'consentimiento-infantil': consentimientoInfantil,
@@ -248,6 +316,7 @@ const GENERATORS = {
     'historial-clinico': historialClinico,
     'perfil-clinico': perfilClinico,
     'plan-intervencion': planIntervencion,
+    'expediente-completo': expedienteCompleto,
 };
 
 /**

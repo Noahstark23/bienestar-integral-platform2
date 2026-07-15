@@ -146,6 +146,47 @@ export async function sendSessionReminder(session) {
 }
 
 /**
+ * Envía el respaldo de la base de datos como adjunto al correo de la
+ * profesional (BACKUP_EMAIL o, en su defecto, SMTP_USER).
+ * Devuelve true si se envió, false si no hay SMTP o falló.
+ */
+export async function sendBackupEmail(buffer, filename) {
+    if (!transporter) return false;
+    const to = process.env.BACKUP_EMAIL || process.env.SMTP_USER;
+    if (!to) return false;
+
+    const fechaStr = new Date().toLocaleDateString('es-NI', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    const html = `
+        <div style="font-family: Arial, sans-serif; max-width: 520px; margin: auto; padding: 24px; color: #1e293b;">
+            <h2 style="color: #0284c7; margin-bottom: 4px;">Bienestar Integral</h2>
+            <p style="color: #64748b; font-size: 14px; margin-top: 0;">Respaldo automático de datos</p>
+            <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 16px 0;">
+            <p>Adjunto encontrarás el respaldo de la base de datos del consultorio correspondiente al <strong>${fechaStr}</strong>.</p>
+            <p style="font-size: 13px; color: #64748b;">Guarda este correo: contiene todos los expedientes, citas y facturación. Con él se puede restaurar el sistema completo si el servidor falla. No lo compartas con nadie.</p>
+        </div>
+    `;
+
+    try {
+        await transporter.sendMail({
+            from: FROM,
+            to,
+            subject: `💾 Respaldo de datos – ${fechaStr}`,
+            html,
+            attachments: [{ filename, content: buffer }],
+        });
+        logger.info(`Respaldo enviado por correo a ${to} (${(buffer.length / 1024).toFixed(1)} KB)`);
+        return true;
+    } catch (err) {
+        logger.error('Error enviando respaldo por correo', err);
+        return false;
+    }
+}
+
+export function smtpConfigured() {
+    return !!transporter;
+}
+
+/**
  * Envía recordatorio de factura pendiente al paciente.
  */
 export async function sendInvoiceReminder(invoice) {

@@ -23,6 +23,7 @@ const FASE_LABEL: Record<string, string> = {
 };
 
 const DOCUMENTOS: { tipo: string; titulo: string; desc: string }[] = [
+    { tipo: 'expediente-completo', titulo: 'Expediente Clínico Completo', desc: 'Todo el caso en un PDF: datos, anamnesis, plan, sesiones, escalas — para remisiones o traslados' },
     { tipo: 'historial-clinico', titulo: 'Historial Clínico (Anamnesis)', desc: 'Historia completa del paciente' },
     { tipo: 'entrevista', titulo: 'Entrevista Psicológica', desc: 'Formato de primera sesión' },
     { tipo: 'contrato-adultos', titulo: 'Contrato Terapéutico (Adultos)', desc: 'Consentimiento informado, mayores de edad' },
