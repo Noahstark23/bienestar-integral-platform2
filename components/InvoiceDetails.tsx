@@ -233,8 +233,10 @@ export const InvoiceDetails: React.FC<Props> = ({ invoice, onClose, onUpdate, on
                 doc.setTextColor(50, 50, 50);
             }
 
-            doc.text("IVA (15%):", 140, finalY + 12);
-            doc.text(`C$ ${invoice.iva.toFixed(2)}`, 170, finalY + 12);
+            if (invoice.iva > 0) {
+                doc.text("IVA (15%):", 140, finalY + 12);
+                doc.text(`C$ ${invoice.iva.toFixed(2)}`, 170, finalY + 12);
+            }
 
             doc.setFontSize(14);
             doc.setTextColor(brandColor[0], brandColor[1], brandColor[2]);
@@ -384,10 +386,12 @@ export const InvoiceDetails: React.FC<Props> = ({ invoice, onClose, onUpdate, on
                                     <span className="font-medium text-red-600">- {formatCurrency(invoice.descuento)}</span>
                                 </div>
                             )}
-                            <div className="flex justify-between">
-                                <span className="text-slate-600">IVA (15%):</span>
-                                <span className="font-medium text-slate-900">{formatCurrency(invoice.iva)}</span>
-                            </div>
+                            {invoice.iva > 0 && (
+                                <div className="flex justify-between">
+                                    <span className="text-slate-600">IVA (15%):</span>
+                                    <span className="font-medium text-slate-900">{formatCurrency(invoice.iva)}</span>
+                                </div>
+                            )}
                             <div className="border-t border-brand-300 pt-3 flex justify-between">
                                 <span className="font-bold text-slate-800">TOTAL:</span>
                                 <span className="font-bold text-xl text-brand-600">{formatCurrency(invoice.total)}</span>

@@ -108,7 +108,7 @@ function consentimientoInfantil(p) {
                 '5. Facilitar el contacto con familiares cuando la terapeuta lo indique y previo acuerdo.',
             ]},
             { heading: 'Autorización', lines: [
-                `Por medio de la presente, yo ${val(p?.tutorNombre)}, con identificación ${BLANK}, en calidad de representante legal (${val(p?.tutorRelacion, 'parentesco')}) de ${val(p?.nombre)}, menor de edad, con fecha de nacimiento ${val(p?.fechaNacimiento ? fechaLarga(p.fechaNacimiento) : '')}, AUTORIZO iniciar un proceso terapéutico con la ${PROFESIONAL.nombre}, ${PROFESIONAL.profesion}, código MINSA Nº ${PROFESIONAL.codigoMinsa}.`,
+                `Por medio de la presente, yo ${val(p?.tutorNombre)}, con identificación ${val(p?.tutorIdentificacion)}, en calidad de representante legal (${val(p?.tutorRelacion, 'parentesco')}) de ${val(p?.nombre)}, menor de edad, con fecha de nacimiento ${val(p?.fechaNacimiento ? fechaLarga(p.fechaNacimiento) : '')}, AUTORIZO iniciar un proceso terapéutico con la ${PROFESIONAL.nombre}, ${PROFESIONAL.profesion}, código MINSA Nº ${PROFESIONAL.codigoMinsa}.`,
                 '',
                 `Acepto que el tratamiento se desarrollará en sesiones de 50 minutos, con frecuencia ${BLANK} los días ${BLANK}. Los honorarios de cada sesión serán de 700 córdobas y comprendo que deberán abonarse según los términos del contrato.`,
                 '',
@@ -117,7 +117,7 @@ function consentimientoInfantil(p) {
             { heading: 'Firmas', lines: [
                 `Fecha: ${fechaLarga()}`,
                 '',
-                `Firma del tutor (${val(p?.tutorNombre, 'representante')}): ____________________  Identificación: ____________`,
+                `Firma del tutor (${val(p?.tutorNombre, 'representante')}): ____________________  Identificación: ${val(p?.tutorIdentificacion, '____________')}`,
                 '',
                 `Firma del profesional: ${PROFESIONAL.nombre} — Cód. MINSA: ${PROFESIONAL.codigoMinsa}`,
                 '',
@@ -133,14 +133,14 @@ function entrevista(p) {
         secciones: [
             { heading: 'I. Datos generales', lines: [
                 `Nombres y apellidos: ${val(p?.nombre)}`,
-                `Edad: ${val(p?.edad)}        Estado civil: ${val(p?.estadoCivil)}`,
+                `Edad: ${val(p?.edad)}        Género: ${val(p?.sexo)}        Estado civil: ${val(p?.estadoCivil)}`,
                 `Ocupación: ${val(p?.ocupacion)}        Escolaridad: ${val(p?.escolaridad)}`,
                 `N° Celular: ${val(p?.telefono)}        Fecha: ${fechaLarga()}`,
-                `Remisión: ${BLANK}        Situación laboral: ${BLANK}`,
-                `Barrio: ${BLANK}        N° de hijas/os: ${BLANK}`,
-                `Cómo le llaman en casa: ${BLANK}`,
-                `Nombre de la madre: ${BLANK}   Teléfono: ${BLANK}`,
-                `Nombre del padre: ${BLANK}   Teléfono: ${BLANK}`,
+                `Remisión: ${val(p?.remision)}        Situación laboral: ${val(p?.situacionLaboral)}`,
+                `Barrio: ${val(p?.barrio)}        N° de hijas/os: ${val(p?.numHijos)}`,
+                `Cómo le llaman en casa: ${val(p?.apodo)}`,
+                `Nombre de la madre: ${val(p?.nombreMadre)}   Teléfono: ${val(p?.telefonoMadre)}`,
+                `Nombre del padre: ${val(p?.nombrePadre)}   Teléfono: ${val(p?.telefonoPadre)}`,
                 `¿Padece alguna enfermedad?: ${val(cr.antecedentesMedicos, BLANK)}`,
             ]},
             { heading: 'II. Motivo de consulta', lines: [
@@ -176,12 +176,13 @@ function historialClinico(p) {
         secciones: [
             { heading: 'Datos generales', lines: [
                 `Fecha: ${fechaLarga()}        Hora: ______        No. de expediente: ${val(p?.id)}`,
-                `Nombre: ${val(p?.nombre)}        Edad: ${val(p?.edad)}        Sexo: ${BLANK}`,
-                `Nombre del padre: ${BLANK}        Nombre de la madre: ${BLANK}`,
+                `Nombre: ${val(p?.nombre)}        Edad: ${val(p?.edad)}        Sexo: ${val(p?.sexo)}`,
+                `Nombre del padre: ${val(p?.nombrePadre)}        Nombre de la madre: ${val(p?.nombreMadre)}`,
+                `Dirección: ${val(p?.direccion)}        Barrio: ${val(p?.barrio)}`,
                 `Teléfono: ${val(p?.telefono)}        Nivel escolar: ${val(p?.escolaridad)}`,
-                `Lugar y fecha de nacimiento: ${val(p?.fechaNacimiento ? fechaLarga(p.fechaNacimiento) : '')}`,
+                `Lugar y fecha de nacimiento: ${val(p?.lugarNacimiento)}, ${val(p?.fechaNacimiento ? fechaLarga(p.fechaNacimiento) : '')}`,
                 `Atendido por: ${PROFESIONAL.nombre}`,
-                `Informante: ${val(p?.tutorNombre, BLANK)}        Referente: ${BLANK}`,
+                `Informante: ${val(p?.tutorNombre, BLANK)}        Referente: ${val(p?.remision)}`,
             ]},
             { heading: 'I. Familiograma', lines: [BLANK] },
             { heading: 'II. Motivo de consulta', lines: [val(p?.motivo)] },

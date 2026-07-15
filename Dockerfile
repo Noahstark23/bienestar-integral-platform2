@@ -68,4 +68,9 @@ EXPOSE 3000
 
 ENV NODE_ENV=production
 
+# Detecta proceso colgado (no solo caído): si /api/health no responde,
+# Docker marca el contenedor unhealthy y Coolify puede auto-reiniciarlo.
+HEALTHCHECK --interval=30s --timeout=10s --start-period=90s --retries=3 \
+    CMD wget -qO- http://localhost:${PORT:-3000}/api/health || exit 1
+
 ENTRYPOINT ["./docker-entrypoint.sh"]

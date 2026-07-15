@@ -73,8 +73,14 @@ export const VirtualSessionManager: React.FC<Props> = ({ onJoinAsDoctor }) => {
 
     const fetchPatients = async () => {
         try {
-            const res = await fetch('/api/patients', { headers: authHeaders() });
-            if (res.ok) setPatients(await res.json());
+            // La API devuelve { data, total, ... }: extraer el array (antes se
+            // guardaba el objeto completo y patients.map tronaba) y limit=100
+            // para no truncar el selector a los primeros 20.
+            const res = await fetch('/api/patients?limit=100', { headers: authHeaders() });
+            if (res.ok) {
+                const data = await res.json();
+                setPatients(Array.isArray(data?.data) ? data.data : Array.isArray(data) ? data : []);
+            }
         } catch (e) { console.error(e); }
     };
 

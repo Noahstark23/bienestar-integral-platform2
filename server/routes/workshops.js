@@ -165,10 +165,16 @@ router.delete('/:id/waitlist/:entryId', async (req, res, next) => {
 });
 
 // POST /api/workshops/:id/enroll
+// Acepta paciente registrado ({ patientId }) O participante externo
+// ({ nombreExterno, telefonoExterno }) que no está en el sistema.
 router.post('/:id/enroll', async (req, res, next) => {
     try {
         const workshopId = parseInt(req.params.id);
-        const { patientId } = req.body;
+        const { patientId, nombreExterno, telefonoExterno } = req.body;
+
+        if (!patientId && !nombreExterno) {
+            return res.status(400).json({ error: 'Indica un paciente registrado o el nombre del participante externo' });
+        }
 
         const workshop = await prisma.workshop.findUnique({
             where: { id: workshopId },
@@ -180,14 +186,27 @@ router.post('/:id/enroll', async (req, res, next) => {
             return res.status(400).json({ error: 'Cupo lleno' });
         }
 
-        const existing = await prisma.workshopEnrollment.findUnique({
-            where: { workshopId_patientId: { workshopId, patientId: parseInt(patientId) } }
-        });
-        if (existing) return res.status(400).json({ error: 'Paciente ya inscrito' });
+        let data;
+        if (patientId) {
+            const existing = await prisma.workshopEnrollment.findFirst({
+                where: { workshopId, patientId: parseInt(patientId) }
+            });
+            if (existing) return res.status(400).json({ error: 'Paciente ya inscrito' });
+            data = { workshopId, patientId: parseInt(patientId) };
+        } else {
+            // Externo: evita duplicado por nombre en el mismo taller
+            const dup = await prisma.workshopEnrollment.findFirst({
+                where: { workshopId, nombreExterno: String(nombreExterno).trim() }
+            });
+            if (dup) return res.status(400).json({ error: 'Ese participante ya está inscrito' });
+            data = {
+                workshopId,
+                nombreExterno: String(nombreExterno).trim(),
+                telefonoExterno: telefonoExterno ? String(telefonoExterno).trim() : ''
+            };
+        }
 
-        const enrollment = await prisma.workshopEnrollment.create({
-            data: { workshopId, patientId: parseInt(patientId) }
-        });
+        const enrollment = await prisma.workshopEnrollment.create({ data });
         res.json(enrollment);
     } catch (err) {
         logger.error('POST /api/workshops/:id/enroll', err);

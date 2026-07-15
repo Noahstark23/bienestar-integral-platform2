@@ -66,12 +66,20 @@ export const CalendarView: React.FC = () => {
     const fetchEvents = async (start: Date, end: Date) => {
         setLoading(true);
         try {
+            // La ruta /api/calendar/events es protegida: sin el token JWT
+            // respondía 401 y la agenda quedaba vacía (bug reportado).
             const res = await fetch(
-                `/api/calendar/events?start=${start.toISOString()}&end=${end.toISOString()}`
+                `/api/calendar/events?start=${start.toISOString()}&end=${end.toISOString()}`,
+                { headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token') || ''}` } }
             );
+            if (!res.ok) {
+                console.error('Error cargando eventos del calendario:', res.status);
+                return;
+            }
             const data = await res.json();
+            const list = Array.isArray(data) ? data : [];
 
-            const parsedEvents = data.map((e: any) => ({
+            const parsedEvents = list.map((e: any) => ({
                 ...e,
                 start: new Date(e.start),
                 end: new Date(e.end)

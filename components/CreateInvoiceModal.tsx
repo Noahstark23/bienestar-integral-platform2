@@ -59,6 +59,8 @@ export const CreateInvoiceModal: React.FC<Props> = ({ onClose, onSuccess }) => {
     // Discount & Notes
     const [descuento, setDescuento] = useState(0);
     const [notas, setNotas] = useState('');
+    // IVA opcional: por defecto NO se aplica (se emite la cantidad exacta)
+    const [aplicaIva, setAplicaIva] = useState(false);
 
     // UI State
     const [loading, setLoading] = useState(false);
@@ -69,12 +71,28 @@ export const CreateInvoiceModal: React.FC<Props> = ({ onClose, onSuccess }) => {
         'Authorization': `Bearer ${localStorage.getItem('auth_token') || ''}`
     });
 
-    // Fetch Patients on mount
+    // Fetch Patients on mount — recorre TODAS las páginas para que el selector
+    // incluya a todos los pacientes (antes solo cargaba los primeros 20).
     useEffect(() => {
-        fetch('/api/patients', { headers: getAuthHeaders() })
-            .then(res => res.json())
-            .then(data => setPatients(Array.isArray(data?.data) ? data.data : Array.isArray(data) ? data : []))
-            .catch(err => console.error('Error fetching patients:', err));
+        const fetchAllPatients = async () => {
+            try {
+                const all: Patient[] = [];
+                let page = 1, totalPages = 1;
+                do {
+                    const res = await fetch(`/api/patients?page=${page}&limit=100`, { headers: getAuthHeaders() });
+                    if (!res.ok) break;
+                    const data = await res.json();
+                    const batch = Array.isArray(data?.data) ? data.data : Array.isArray(data) ? data : [];
+                    all.push(...batch);
+                    totalPages = data?.totalPages || 1;
+                    page++;
+                } while (page <= totalPages);
+                setPatients(all);
+            } catch (err) {
+                console.error('Error fetching patients:', err);
+            }
+        };
+        fetchAllPatients();
     }, []);
 
     // Fetch Items when Patient Selected
@@ -152,7 +170,7 @@ export const CreateInvoiceModal: React.FC<Props> = ({ onClose, onSuccess }) => {
     const subtotalCustom = customItems.reduce((sum, i) => sum + (i.quantity * i.unitPrice), 0);
 
     const subtotal = subtotalSessions + subtotalWorkshops + subtotalCustom;
-    const iva = (subtotal - descuento) * 0.15;
+    const iva = aplicaIva ? (subtotal - descuento) * 0.15 : 0;
     const total = (subtotal - descuento) + iva;
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -175,6 +193,7 @@ export const CreateInvoiceModal: React.FC<Props> = ({ onClose, onSuccess }) => {
                     customItems,
                     descuento,
                     notas,
+                    aplicaIva,
                     sessionPriceOverrides,
                     enrollmentPriceOverrides
                 })
@@ -518,8 +537,16 @@ export const CreateInvoiceModal: React.FC<Props> = ({ onClose, onSuccess }) => {
                                                 <span>- {formatCurrency(descuento)}</span>
                                             </div>
                                         )}
-                                        <div className="flex justify-between text-sm">
-                                            <span className="text-slate-600">IVA (15%)</span>
+                                        <div className="flex justify-between items-center text-sm">
+                                            <label className="flex items-center gap-2 text-slate-600 cursor-pointer select-none">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={aplicaIva}
+                                                    onChange={e => setAplicaIva(e.target.checked)}
+                                                    className="rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                                                />
+                                                Aplicar IVA (15%)
+                                            </label>
                                             <span className="font-medium">{formatCurrency(iva)}</span>
                                         </div>
                                         <div className="flex justify-between text-lg font-bold text-slate-800 pt-2">

@@ -62,7 +62,9 @@ invoicesRouter.post('/', authenticateToken, async (req, res, next) => {
         const subtotal = sessionsTotal + workshopsTotal + customTotal;
         const descuentoMonto = descuento || 0;
         const subtotalConDescuento = subtotal - descuentoMonto;
-        const iva = subtotalConDescuento * 0.15;
+        // IVA opcional: por defecto NO se aplica (emite la cantidad exacta).
+        // Solo se aplica 15% si el frontend manda aplicaIva: true.
+        const iva = req.body.aplicaIva ? subtotalConDescuento * 0.15 : 0;
         const total = subtotalConDescuento + iva;
 
         // Generar número único
@@ -216,7 +218,9 @@ invoicesRouter.put('/:id', authenticateToken, async (req, res, next) => {
 
         if (descuento !== undefined && descuento !== invoice.descuento) {
             const subtotalConDescuento = invoice.subtotal - descuento;
-            const iva = subtotalConDescuento * 0.15;
+            // Mantiene el criterio original de la factura: si se emitió sin IVA,
+            // sigue sin IVA; si se emitió con IVA (>0), recalcula el 15%.
+            const iva = invoice.iva > 0 ? subtotalConDescuento * 0.15 : 0;
             const total = subtotalConDescuento + iva;
             const saldo = total - invoice.pagado;
             updateData.descuento = descuento;

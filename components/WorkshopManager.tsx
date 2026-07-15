@@ -3,7 +3,9 @@ import { Plus, Calendar, Users, MapPin, DollarSign, Clock, ChevronDown, ChevronU
 
 interface Enrollment {
     id: number;
-    patient: { id: number; nombre: string; telefono?: string };
+    patient: { id: number; nombre: string; telefono?: string } | null; // null = participante externo
+    nombreExterno?: string;
+    telefonoExterno?: string;
     fechaInscripcion: string;
     pagado: boolean;
 }
@@ -59,6 +61,10 @@ export const WorkshopManager: React.FC = () => {
     const [formData, setFormData] = useState(EMPTY_WORKSHOP);
     const [selectedPatientId, setSelectedPatientId] = useState<number>(0);
     const [savingStatus, setSavingStatus] = useState<number | null>(null);
+    // Participante externo (no registrado como paciente)
+    const [externalMode, setExternalMode] = useState(false);
+    const [externalName, setExternalName] = useState('');
+    const [externalPhone, setExternalPhone] = useState('');
 
     useEffect(() => {
         fetchWorkshops();
@@ -157,18 +163,24 @@ export const WorkshopManager: React.FC = () => {
     // ── ENROLL ──────────────────────────────────────────────────
     const handleEnroll = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!showEnrollModal || !selectedPatientId) return;
+        if (!showEnrollModal) return;
+        // Paciente registrado O participante externo (nombre libre)
+        const body = externalMode
+            ? { nombreExterno: externalName.trim(), telefonoExterno: externalPhone.trim() }
+            : { patientId: selectedPatientId };
+        if (externalMode ? !externalName.trim() : !selectedPatientId) return;
         try {
             const res = await fetch(`/api/workshops/${showEnrollModal}/enroll`, {
                 method: 'POST',
                 headers: getAuthHeaders(),
-                body: JSON.stringify({ patientId: selectedPatientId })
+                body: JSON.stringify(body)
             });
             if (res.ok) {
                 setShowEnrollModal(null);
                 setSelectedPatientId(0);
+                setExternalMode(false); setExternalName(''); setExternalPhone('');
                 fetchWorkshops();
-                showMsg('Paciente inscrito exitosamente.');
+                showMsg(externalMode ? 'Participante externo inscrito exitosamente.' : 'Paciente inscrito exitosamente.');
             } else {
                 const err = await res.json();
                 showMsg(`Error: ${err.error}`, false);
@@ -369,9 +381,14 @@ export const WorkshopManager: React.FC = () => {
                                             {workshop.enrollments.map(enrollment => (
                                                 <li key={enrollment.id} className="px-5 py-3 flex items-center justify-between gap-2">
                                                     <div className="min-w-0">
-                                                        <p className="text-sm font-medium text-slate-800">{enrollment.patient.nombre}</p>
-                                                        {enrollment.patient.telefono && (
-                                                            <p className="text-xs text-slate-400">{enrollment.patient.telefono}</p>
+                                                        <p className="text-sm font-medium text-slate-800">
+                                                            {enrollment.patient?.nombre ?? enrollment.nombreExterno}
+                                                            {!enrollment.patient && (
+                                                                <span className="ml-2 text-[10px] uppercase tracking-wide bg-violet-100 text-violet-700 px-1.5 py-0.5 rounded-full">Externo</span>
+                                                            )}
+                                                        </p>
+                                                        {(enrollment.patient?.telefono || enrollment.telefonoExterno) && (
+                                                            <p className="text-xs text-slate-400">{enrollment.patient?.telefono ?? enrollment.telefonoExterno}</p>
                                                         )}
                                                     </div>
                                                     <div className="flex items-center gap-1.5 shrink-0">
@@ -383,7 +400,7 @@ export const WorkshopManager: React.FC = () => {
                                                             {enrollment.pagado ? '✓ Pagado' : 'Pendiente'}
                                                         </button>
                                                         <button
-                                                            onClick={() => handleUnenroll(workshop.id, enrollment.id, enrollment.patient.nombre)}
+                                                            onClick={() => handleUnenroll(workshop.id, enrollment.id, enrollment.patient?.nombre ?? enrollment.nombreExterno ?? 'participante')}
                                                             className="text-xs flex items-center gap-1 text-red-500 hover:text-red-700 hover:bg-red-50 px-2 py-1 rounded transition-colors"
                                                         >
                                                             <UserX size={13} />
@@ -514,23 +531,60 @@ export const WorkshopManager: React.FC = () => {
                                 </p>
                             )}
                             <form onSubmit={isWaitlistMode ? (e) => { e.preventDefault(); handleAddToWaitlist(showEnrollModal); } : handleEnroll} className="space-y-4">
-                                <div>
-                                    <label className="block text-sm font-medium mb-1">Seleccionar Paciente *</label>
-                                    <select
-                                        required
-                                        className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-                                        value={selectedPatientId}
-                                        onChange={e => setSelectedPatientId(Number(e.target.value))}
-                                    >
-                                        <option value={0}>-- Seleccionar --</option>
-                                        {patients.map(p => (
-                                            <option key={p.id} value={p.id}>{p.nombre}</option>
-                                        ))}
-                                    </select>
-                                </div>
+                                {/* Participante externo solo aplica a inscripción (la lista de espera requiere paciente) */}
+                                {!isWaitlistMode && (
+                                    <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer select-none">
+                                        <input
+                                            type="checkbox"
+                                            checked={externalMode}
+                                            onChange={e => { setExternalMode(e.target.checked); setSelectedPatientId(0); }}
+                                            className="rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                                        />
+                                        Participante externo (no registrado como paciente)
+                                    </label>
+                                )}
+
+                                {externalMode && !isWaitlistMode ? (
+                                    <div className="space-y-3">
+                                        <div>
+                                            <label className="block text-sm font-medium mb-1">Nombre completo *</label>
+                                            <input
+                                                required
+                                                value={externalName}
+                                                onChange={e => setExternalName(e.target.value)}
+                                                placeholder="Ej: Ana Martínez"
+                                                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium mb-1">Teléfono</label>
+                                            <input
+                                                value={externalPhone}
+                                                onChange={e => setExternalPhone(e.target.value)}
+                                                placeholder="Ej: 8888-8888"
+                                                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                                            />
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div>
+                                        <label className="block text-sm font-medium mb-1">Seleccionar Paciente *</label>
+                                        <select
+                                            required
+                                            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                                            value={selectedPatientId}
+                                            onChange={e => setSelectedPatientId(Number(e.target.value))}
+                                        >
+                                            <option value={0}>-- Seleccionar --</option>
+                                            {patients.map(p => (
+                                                <option key={p.id} value={p.id}>{p.nombre}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                )}
                                 <div className="flex gap-3 pt-2">
-                                    <button type="button" onClick={() => setShowEnrollModal(null)} className="flex-1 border border-slate-200 py-2.5 rounded-lg text-sm hover:bg-slate-50">Cancelar</button>
-                                    <button type="submit" disabled={!selectedPatientId} className={`flex-1 text-white py-2.5 rounded-lg text-sm font-medium disabled:opacity-50 ${isWaitlistMode ? 'bg-amber-500 hover:bg-amber-600' : 'bg-brand-600 hover:bg-brand-700'}`}>
+                                    <button type="button" onClick={() => { setShowEnrollModal(null); setExternalMode(false); setExternalName(''); setExternalPhone(''); }} className="flex-1 border border-slate-200 py-2.5 rounded-lg text-sm hover:bg-slate-50">Cancelar</button>
+                                    <button type="submit" disabled={externalMode && !isWaitlistMode ? !externalName.trim() : !selectedPatientId} className={`flex-1 text-white py-2.5 rounded-lg text-sm font-medium disabled:opacity-50 ${isWaitlistMode ? 'bg-amber-500 hover:bg-amber-600' : 'bg-brand-600 hover:bg-brand-700'}`}>
                                         {isWaitlistMode ? 'Añadir a Lista de Espera' : 'Confirmar Inscripción'}
                                     </button>
                                 </div>

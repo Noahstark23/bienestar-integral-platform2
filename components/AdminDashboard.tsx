@@ -75,6 +75,77 @@ const AuditLogPanel: React.FC<{ getAuthHeaders: () => Record<string, string> }> 
   );
 };
 
+// ── ChangePasswordPanel ────────────────────────────────────────────────────
+const ChangePasswordPanel: React.FC<{ getAuthHeaders: () => Record<string, string> }> = ({ getAuthHeaders }) => {
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState('');
+  const [err, setErr] = useState('');
+
+  const handleChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setMsg(''); setErr('');
+    if (newPassword.length < 8) { setErr('La nueva contraseña debe tener al menos 8 caracteres.'); return; }
+    if (newPassword !== confirmPassword) { setErr('La confirmación no coincide con la nueva contraseña.'); return; }
+    setSaving(true);
+    try {
+      const r = await fetch('/api/auth/change-password', {
+        method: 'POST',
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currentPassword, newPassword }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (r.ok) {
+        setMsg('Contraseña actualizada correctamente.');
+        setCurrentPassword(''); setNewPassword(''); setConfirmPassword('');
+      } else {
+        setErr(d.error || 'No se pudo cambiar la contraseña.');
+      }
+    } catch {
+      setErr('Error de conexión. Intenta de nuevo.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+      <div className="px-6 py-4 border-b border-slate-100 bg-slate-50">
+        <h3 className="font-bold text-slate-800">Seguridad — Cambiar Contraseña</h3>
+      </div>
+      <form onSubmit={handleChange} className="p-6 space-y-4 max-w-md">
+        {msg && <p className="text-sm text-green-600 font-medium">{msg}</p>}
+        {err && <p className="text-sm text-red-600">{err}</p>}
+        {[
+          { label: 'Contraseña actual', value: currentPassword, set: setCurrentPassword },
+          { label: 'Nueva contraseña (mín. 8 caracteres)', value: newPassword, set: setNewPassword },
+          { label: 'Confirmar nueva contraseña', value: confirmPassword, set: setConfirmPassword },
+        ].map(f => (
+          <div key={f.label}>
+            <label className="block text-sm font-semibold text-slate-700 mb-1">{f.label}</label>
+            <input
+              type="password"
+              value={f.value}
+              onChange={e => f.set(e.target.value)}
+              required
+              className="w-full border border-slate-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+            />
+          </div>
+        ))}
+        <button
+          type="submit"
+          disabled={saving || !currentPassword || !newPassword || !confirmPassword}
+          className="bg-brand-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-brand-700 disabled:opacity-50 transition-colors"
+        >
+          {saving ? 'Guardando...' : 'Cambiar Contraseña'}
+        </button>
+      </form>
+    </div>
+  );
+};
+
 // ── TwoFactorPanel ─────────────────────────────────────────────────────────
 const TwoFactorPanel: React.FC<{ getAuthHeaders: () => Record<string, string> }> = ({ getAuthHeaders }) => {
   const [status, setStatus] = React.useState<null | boolean>(null); // null=loading, true=enabled, false=disabled
@@ -371,7 +442,7 @@ export const AdminDashboard: React.FC = () => {
         setLoading(true);
 
         const responses = await Promise.all([
-          fetch('/api/patients', { headers: getAuthHeaders() }),
+          fetch('/api/patients?limit=100', { headers: getAuthHeaders() }),
           fetch('/api/sessions', { headers: getAuthHeaders() }),
           fetch('/api/expenses', { headers: getAuthHeaders() }),
           fetch('/api/appointments', { headers: getAuthHeaders() }),
@@ -1034,6 +1105,7 @@ export const AdminDashboard: React.FC = () => {
         {/* Config - Availability Management + Audit */}
         {activeTab === 'config' && (
           <div className="space-y-8">
+            <ChangePasswordPanel getAuthHeaders={getAuthHeaders} />
             <TwoFactorPanel getAuthHeaders={getAuthHeaders} />
             <AvailabilityManager />
             <TelmedAvailabilityManager />

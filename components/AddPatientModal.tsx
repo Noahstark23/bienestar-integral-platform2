@@ -21,7 +21,22 @@ export const AddPatientModal: React.FC<AddPatientModalProps> = ({ onClose, onSuc
         escolaridad: '',
         estadoCivil: '',
         tutorNombre: '',
-        tutorRelacion: ''
+        tutorRelacion: '',
+        // Datos ampliados: se auto-rellenan en los instrumentos/documentos
+        sexo: '',
+        direccion: '',
+        barrio: '',
+        lugarNacimiento: '',
+        remision: '',
+        situacionLaboral: '',
+        numHijos: '',
+        apodo: '',
+        nombreMadre: '',
+        telefonoMadre: '',
+        nombrePadre: '',
+        telefonoPadre: '',
+        tutorIdentificacion: '',
+        email: ''
     });
 
     const calculateAge = (birthDate: string) => {
@@ -224,6 +239,55 @@ export const AddPatientModal: React.FC<AddPatientModalProps> = ({ onClose, onSuc
                             </div>
                         </div>
 
+                        {/* Datos para el expediente y los documentos (auto-relleno de instrumentos) */}
+                        <div className="border-t pt-6">
+                            <h3 className="text-lg font-bold text-slate-800 mb-1 flex items-center gap-2">
+                                <FileText size={20} className="text-brand-600" />
+                                Datos para el Expediente
+                            </h3>
+                            <p className="text-xs text-slate-500 mb-4">Opcionales — se reflejan automáticamente en la entrevista, el historial clínico y los consentimientos.</p>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-semibold text-slate-700 mb-2">Sexo / Género</label>
+                                    <select
+                                        value={formData.sexo}
+                                        onChange={(e) => setFormData({ ...formData, sexo: e.target.value })}
+                                        className="w-full px-4 py-3 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500"
+                                    >
+                                        <option value="">Seleccionar...</option>
+                                        <option value="Femenino">Femenino</option>
+                                        <option value="Masculino">Masculino</option>
+                                        <option value="Otro">Otro</option>
+                                    </select>
+                                </div>
+                                {[
+                                    { label: 'Correo electrónico', key: 'email', placeholder: 'correo@ejemplo.com' },
+                                    { label: 'Dirección', key: 'direccion', placeholder: 'Dirección de domicilio' },
+                                    { label: 'Barrio', key: 'barrio', placeholder: 'Barrio / comunidad' },
+                                    { label: 'Lugar de nacimiento', key: 'lugarNacimiento', placeholder: 'Ciudad, departamento' },
+                                    { label: 'Remisión / Referente', key: 'remision', placeholder: '¿Quién lo refiere?' },
+                                    { label: 'Situación laboral', key: 'situacionLaboral', placeholder: 'Empleado, desempleado...' },
+                                    { label: 'N° de hijas/os', key: 'numHijos', placeholder: 'Ej: 2' },
+                                    { label: 'Cómo le llaman en casa', key: 'apodo', placeholder: 'Apodo familiar' },
+                                    { label: 'Nombre de la madre', key: 'nombreMadre', placeholder: 'Nombre completo' },
+                                    { label: 'Teléfono de la madre', key: 'telefonoMadre', placeholder: 'Ej: 8888-8888' },
+                                    { label: 'Nombre del padre', key: 'nombrePadre', placeholder: 'Nombre completo' },
+                                    { label: 'Teléfono del padre', key: 'telefonoPadre', placeholder: 'Ej: 8888-8888' },
+                                ].map(f => (
+                                    <div key={f.key}>
+                                        <label className="block text-sm font-semibold text-slate-700 mb-2">{f.label}</label>
+                                        <input
+                                            type="text"
+                                            value={(formData as any)[f.key]}
+                                            onChange={(e) => setFormData({ ...formData, [f.key]: e.target.value })}
+                                            className="w-full px-4 py-3 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500"
+                                            placeholder={f.placeholder}
+                                        />
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
                         {/* Tutor Info (si es menor) */}
                         {isMinor && (
                             <div className="border-t pt-6">
@@ -262,6 +326,19 @@ export const AddPatientModal: React.FC<AddPatientModalProps> = ({ onClose, onSuc
                                             <option value="Tío/a">Tío/a</option>
                                             <option value="Otro">Otro</option>
                                         </select>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-semibold text-slate-700 mb-2">
+                                            Identificación del Tutor (cédula)
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={formData.tutorIdentificacion}
+                                            onChange={(e) => setFormData({ ...formData, tutorIdentificacion: e.target.value })}
+                                            className="w-full px-4 py-3 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500"
+                                            placeholder="Ej: 001-123456-0000X"
+                                        />
                                     </div>
                                 </div>
                             </div>
