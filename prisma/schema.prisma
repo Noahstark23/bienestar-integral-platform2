@@ -22,6 +22,28 @@ model User {
 }
 
 // ============================================
+// NOTE EMBEDDING - Búsqueda semántica sobre expedientes de pacientes
+// Un vector por nota clínica / expediente / meta / evaluación / motivo.
+// (Distinto del RAG de base de conocimiento, que indexa docs estáticos.)
+// ============================================
+model NoteEmbedding {
+  id          Int      @id @default(autoincrement())
+  sourceType  String   // "session" | "clinical_record" | "goal" | "assessment" | "patient"
+  sourceId    Int      // id de la fila de origen
+  patientId   Int
+  patientName String   @default("")
+  fecha       DateTime @default(now())  // fecha de la nota (para mostrar el resultado)
+  content     String   // texto indexado (para snippets y detectar cambios)
+  contentHash String   // sha256 del contenido (evita re-embeddear si no cambió)
+  embedding   Float[]  // vector de text-embedding-004 (768 dimensiones)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([sourceType, sourceId])
+  @@index([patientId])
+}
+
+// ============================================
 // PATIENT MODEL - Enhanced with Demographics & Discharge
 // ============================================
 model Patient {

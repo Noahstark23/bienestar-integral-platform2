@@ -2,6 +2,7 @@ import { Router } from 'express';
 import prisma from '../lib/prisma.js';
 import { authenticateToken } from '../middleware/auth.js';
 import logger from '../lib/logger.js';
+import { indexGoal, removeDocument } from '../lib/clinicalSearch.js';
 
 const router = Router();
 router.use(authenticateToken);
@@ -37,6 +38,7 @@ router.post('/', async (req, res, next) => {
                 progreso: 0,
             },
         });
+        indexGoal(goal).catch(() => {}); // Búsqueda semántica: indexar meta
         res.status(201).json(goal);
     } catch (err) {
         logger.error('POST /api/goals', err);
@@ -62,6 +64,7 @@ router.put('/:id', async (req, res, next) => {
             data: updateData,
         });
 
+        indexGoal(updatedGoal).catch(() => {}); // Búsqueda semántica: re-indexar
         res.json(updatedGoal);
     } catch (err) {
         logger.error('PUT /api/goals/:id', err);
@@ -72,7 +75,9 @@ router.put('/:id', async (req, res, next) => {
 // DELETE /api/goals/:id
 router.delete('/:id', async (req, res, next) => {
     try {
-        await prisma.therapeuticGoal.delete({ where: { id: parseInt(req.params.id) } });
+        const goalId = parseInt(req.params.id);
+        await prisma.therapeuticGoal.delete({ where: { id: goalId } });
+        removeDocument('goal', goalId); // Búsqueda semántica: limpiar embedding
         res.json({ success: true });
     } catch (err) {
         logger.error('DELETE /api/goals/:id', err);

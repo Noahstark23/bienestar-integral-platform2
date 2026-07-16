@@ -5,6 +5,10 @@ import prisma from '../lib/prisma.js';
 import logger from '../lib/logger.js';
 import rag from '../lib/rag.js';
 import { generateDocument, DOCUMENT_TYPES } from '../lib/documents.js';
+import {
+    search as buscarNotas,
+    indexSession, indexGoal, indexPatient, indexClinicalRecord, reindexAll
+} from '../lib/clinicalSearch.js';
 
 const router = Router();
 
@@ -151,6 +155,19 @@ const TOOLS = [{
                 },
                 required: ['patientId']
             }
+        },
+        {
+            name: 'buscar_en_notas',
+            description: 'Busca por SIGNIFICADO (búsqueda semántica) dentro de los EXPEDIENTES REALES de los pacientes: notas clínicas SOAP, perfil y plan de intervención, metas, evaluaciones y motivos de consulta. Úsala cuando la psicóloga pregunte por un TEMA, SÍNTOMA o PATRÓN entre pacientes —ej: "¿qué pacientes han mencionado insomnio?", "notas sobre duelo", "casos de ansiedad severa", "quién ha hablado de problemas de pareja"— en lugar de por el nombre exacto de un paciente. NO la confundas con consultar_base_conocimiento (que es sobre el proceso y las plantillas del consultorio, no sobre pacientes). Devuelve fragmentos indicando de qué paciente y fecha provienen.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    consulta: { type: 'string', description: 'Qué se busca, en lenguaje natural (tema, síntoma o concepto)' },
+                    nombrePaciente: { type: 'string', description: 'Opcional: limitar la búsqueda a un paciente concreto' },
+                    limite: { type: 'number', description: 'Cuántos fragmentos devolver (por defecto 5, máximo 20)' }
+                },
+                required: ['consulta']
+            }
         }
     ]
 }];
@@ -212,6 +229,7 @@ async function executeTool(name, args) {
                         estadoPago: args.estadoPago || 'Pendiente'
                     }
                 });
+                indexSession(sesion).catch(() => {}); // Búsqueda semántica: indexar nota
                 return { success: true, id: sesion.id, mensaje: `Sesión de ${args.tipo} registrada para ${args.patientName}` };
             }
 
@@ -225,6 +243,7 @@ async function executeTool(name, args) {
                         estado: 'Activo'
                     }
                 });
+                indexPatient(paciente).catch(() => {}); // Búsqueda semántica: indexar motivo
                 return { success: true, id: paciente.id, mensaje: `Paciente "${args.nombre}" registrado con ID ${paciente.id}` };
             }
 
@@ -240,6 +259,7 @@ async function executeTool(name, args) {
                         fechaLimite: args.fechaLimite ? new Date(args.fechaLimite) : null
                     }
                 });
+                indexGoal(meta).catch(() => {}); // Búsqueda semántica: indexar meta
                 return { success: true, id: meta.id, mensaje: `Meta terapéutica "${args.titulo}" agregada correctamente` };
             }
 
@@ -298,17 +318,49 @@ async function executeTool(name, args) {
                 if (args.planIntervencion !== undefined) crData.planIntervencion = args.planIntervencion;
 
                 if (Object.keys(crData).length > 0) {
-                    await prisma.clinicalRecord.upsert({
+                    const cr = await prisma.clinicalRecord.upsert({
                         where: { patientId },
                         update: crData,
                         create: { patientId, ...crData }
                     });
+                    indexClinicalRecord(cr).catch(() => {}); // Búsqueda semántica: indexar expediente
                 }
                 if (args.faseProceso) {
                     if (!FASES_PROCESO.includes(args.faseProceso)) return { error: `Fase inválida. Use una de: ${FASES_PROCESO.join(', ')}` };
                     await prisma.patient.update({ where: { id: patientId }, data: { faseProceso: args.faseProceso } });
                 }
                 return { success: true, mensaje: 'Expediente clínico actualizado.' };
+            }
+
+            case 'buscar_en_notas': {
+                let patientId = null;
+                if (args.nombrePaciente) {
+                    const p = await prisma.patient.findFirst({
+                        where: { nombre: { contains: args.nombrePaciente, mode: 'insensitive' } },
+                        select: { id: true }
+                    });
+                    if (p) patientId = p.id;
+                }
+                const resultados = await buscarNotas({ query: args.consulta, patientId, limit: args.limite || 5 });
+                if (resultados.length === 0) {
+                    return { mensaje: 'No encontré notas relevantes para esa búsqueda. Puede que aún no estén indexadas (ejecuta el reindexado) o que no exista información sobre ese tema.' };
+                }
+                const labels = {
+                    session: 'Nota de sesión',
+                    clinical_record: 'Expediente clínico',
+                    goal: 'Meta terapéutica',
+                    assessment: 'Evaluación',
+                    patient: 'Ficha del paciente'
+                };
+                return {
+                    resultados: resultados.map(r => ({
+                        paciente: r.patientName || `Paciente #${r.patientId}`,
+                        tipo: labels[r.sourceType] || r.sourceType,
+                        fecha: r.fecha ? new Date(r.fecha).toLocaleDateString('es-NI') : null,
+                        relevancia: `${Math.round(r.score * 100)}%`,
+                        extracto: r.content.length > 600 ? r.content.slice(0, 600) + '…' : r.content
+                    }))
+                };
             }
 
             default:
@@ -385,6 +437,7 @@ CAPACIDADES:
 - CONOCES el proceso clínico del consultorio, la estructura del expediente y las plantillas (consulta_base_conocimiento)
 - GENERAR documentos clínicos por paciente (generar_documento)
 - ACTUALIZAR el perfil clínico, plan de intervención y fase del proceso (actualizar_plan_clinico)
+- BUSCAR POR SIGNIFICADO en los expedientes reales de los pacientes: notas SOAP, planes, metas y evaluaciones (buscar_en_notas)
 
 PROCESO CLÍNICO DE LA LIC. ESMIRNA (úsalo para orientar "qué sigue"):
 1) Paciente nuevo → Primera sesión: entrevista, historia clínica, consentimiento, motivo de consulta, antecedentes; si hay tiempo, pruebas iniciales.
@@ -395,13 +448,15 @@ PROCESO CLÍNICO DE LA LIC. ESMIRNA (úsalo para orientar "qué sigue"):
 9) Alta. Tras el alta, las sesiones de mantenimiento son "Sesiones de seguimiento" (categoría Seguimiento), separadas del registro.
 
 FLUJO CUANDO TE PIDAN HACER ALGO:
-1. Si necesitas el ID de un paciente, primero usa buscar_paciente
-2. Si te preguntan por el proceso, protocolos o plantillas, usa consultar_base_conocimiento ANTES de responder
-3. Luego ejecuta la acción correspondiente
-4. Confirma lo que hiciste de forma clara y concisa
+1. Si necesitas el ID de un paciente concreto, primero usa buscar_paciente
+2. Si te preguntan por el proceso, protocolos o plantillas del consultorio, usa consultar_base_conocimiento ANTES de responder
+3. Si te preguntan por un TEMA, SÍNTOMA o PATRÓN entre pacientes (ej: "quién ha reportado insomnio", "notas sobre duelo"), usa buscar_en_notas — NO buscar_paciente ni consultar_base_conocimiento
+4. Luego ejecuta la acción correspondiente o responde
+5. Confirma lo que hiciste de forma clara y concisa
 
 REGLAS:
 - Cuando respondas sobre el proceso o las plantillas, apóyate en la base de conocimiento; no inventes honorarios, duraciones ni pasos.
+- Cuando respondas usando buscar_en_notas, básate SOLO en los extractos devueltos: cita el paciente y la fecha de cada hallazgo y NUNCA inventes información clínica que no esté en los resultados. Es información confidencial: úsala solo para responder a la psicóloga.
 - Siempre confirma las acciones importantes antes de ejecutarlas si hay ambigüedad en datos críticos (fecha, nombre exacto)
 - Si falta información esencial, pregúntala de forma concisa
 - Responde siempre en español
@@ -506,6 +561,25 @@ router.post('/chat', authenticateToken, async (req, res) => {
             detail: err?.message || String(err),
             modelo: GEMINI_MODEL
         });
+    }
+});
+
+// ============================================================
+// REINDEXADO — genera/actualiza los embeddings de los expedientes de
+// pacientes para la búsqueda semántica (buscar_en_notas). Úsalo una vez tras
+// activar la función, o si algo quedó sin indexar.
+// ============================================================
+router.post('/reindex-notas', authenticateToken, async (req, res) => {
+    try {
+        if (!process.env.GEMINI_API_KEY) {
+            return res.status(503).json({ error: 'GEMINI_API_KEY no configurada' });
+        }
+        logger.info('Reindexado de expedientes iniciado por usuario', { user: req.user?.username });
+        const stats = await reindexAll({ onProgress: msg => logger.info(`[reindex-notas] ${msg}`) });
+        res.json({ success: true, stats });
+    } catch (err) {
+        logger.error('POST /api/agent/reindex-notas', err);
+        res.status(500).json({ error: 'Error al reindexar los expedientes.' });
     }
 });
 
