@@ -3,6 +3,7 @@ import prisma from '../lib/prisma.js';
 import { authenticateToken } from '../middleware/auth.js';
 import logger from '../lib/logger.js';
 import { logAction } from '../middleware/audit.js';
+import { indexPatient, indexClinicalRecord, indexGoal } from '../lib/clinicalSearch.js';
 
 const router = Router();
 router.use(authenticateToken);
@@ -104,6 +105,7 @@ router.post('/', async (req, res, next) => {
         });
 
         logAction(req, 'CREATE_PATIENT', 'Patient', newPatient.id, newPatient.nombre);
+        indexPatient(newPatient).catch(() => {}); // Búsqueda semántica: indexar motivo
         res.status(201).json(newPatient);
     } catch (err) {
         logger.error('POST /api/patients', err);
@@ -136,6 +138,7 @@ router.put('/:id', async (req, res, next) => {
         });
 
         logAction(req, 'UPDATE_PATIENT', 'Patient', updatedPatient.id, updatedPatient.nombre);
+        indexPatient(updatedPatient).catch(() => {}); // Búsqueda semántica: re-indexar
         res.json(updatedPatient);
     } catch (err) {
         logger.error('PUT /api/patients/:id', err);
@@ -241,6 +244,7 @@ router.post('/:id/discharge', async (req, res, next) => {
             data: { estado: 'Alta', fechaAlta: new Date(), motivoAlta: motivoAlta || 'Alta médica' }
         });
 
+        indexPatient(discharged).catch(() => {}); // Búsqueda semántica: re-indexar (motivo de alta)
         res.json(discharged);
     } catch (err) {
         logger.error('POST /api/patients/:id/discharge', err);
@@ -269,6 +273,7 @@ router.post('/:id/clinical-record', async (req, res, next) => {
             }
         });
 
+        indexClinicalRecord(clinicalRecord).catch(() => {}); // Búsqueda semántica: indexar expediente
         res.status(201).json(clinicalRecord);
     } catch (err) {
         logger.error('POST /api/patients/:id/clinical-record', err);
@@ -289,6 +294,7 @@ router.put('/:id/clinical-record', async (req, res, next) => {
         for (const c of CAMPOS) if (req.body[c] !== undefined) data[c] = req.body[c];
 
         const updated = await prisma.clinicalRecord.update({ where: { patientId }, data });
+        indexClinicalRecord(updated).catch(() => {}); // Búsqueda semántica: re-indexar expediente
         res.json(updated);
     } catch (err) {
         logger.error('PUT /api/patients/:id/clinical-record', err);
@@ -312,6 +318,7 @@ router.post('/:id/goals', async (req, res, next) => {
             }
         });
 
+        indexGoal(newGoal).catch(() => {}); // Búsqueda semántica: indexar meta
         res.status(201).json(newGoal);
     } catch (err) {
         logger.error('POST /api/patients/:id/goals', err);

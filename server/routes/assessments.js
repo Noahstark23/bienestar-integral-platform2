@@ -2,6 +2,7 @@ import { Router } from 'express';
 import prisma from '../lib/prisma.js';
 import { authenticateToken } from '../middleware/auth.js';
 import logger from '../lib/logger.js';
+import { indexAssessment, removeDocument } from '../lib/clinicalSearch.js';
 
 const router = Router();
 router.use(authenticateToken);
@@ -82,6 +83,7 @@ router.post('/:patientId/assessments', async (req, res, next) => {
             }
         });
 
+        indexAssessment(assessment).catch(() => {}); // Búsqueda semántica: indexar evaluación
         res.status(201).json({
             ...assessment,
             respuestas: JSON.parse(assessment.respuestas)
@@ -102,6 +104,7 @@ router.delete('/:patientId/assessments/:id', async (req, res, next) => {
         if (!existing) return res.status(404).json({ error: 'Evaluación no encontrada' });
 
         await prisma.assessment.delete({ where: { id } });
+        removeDocument('assessment', id); // Búsqueda semántica: limpiar embedding
         res.json({ message: 'Evaluación eliminada' });
     } catch (err) {
         logger.error('DELETE /assessments/:id', err);
